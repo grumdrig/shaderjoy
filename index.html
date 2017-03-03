@@ -1,8 +1,16 @@
 <!doctype html>
 <title>Shaderjoy</title>
+<div><i>Shaderjoy</i></div>
 <canvas draggable=true></canvas>
 <div id=status></div>
-<style>canvas {XXborder: solid 1px blue}</style>
+<div><input name="s" type=text></input></div>
+<div id=err></div>
+<form>
+<style>
+	canvas {XXborder: solid 1px blue}
+	input { font-size: 14px; }
+	#err { color: #800; }
+</style>
 <script>
 
 let canvas = document.querySelector("canvas");
@@ -11,27 +19,15 @@ canvas.height = 480;
 let gl = canvas.getContext("webgl2");
 let program;
 let shader = "";
-let filename = "default.glsl";
+let filename = window.location.search.substring(3) || "default.glsl";
+document.querySelector("input").value = filename;
 
 canvas.addEventListener("drag", function (e) {
-	console.log(e);
 	if (e.clientX > 0 && e.clientY > 0) {
-		canvas.width = e.x;
-		canvas.height = e.y;
+		canvas.width = e.x - canvas.offsetLeft;
+		canvas.height = e.y - canvas.offsetTop;
 	}
 });
-
-/*
-var xhr = new XMLHttpRequest();
-xhr.open("GET", filename, true);
-//xhr.responseType = "blob";
-xhr.onload = function (e) {
-	if (this.status != 200) throw new Error("Error loading script");
-	go(this.responseText);
-	tick();
-}
-xhr.send();
-*/
 
 function go(glsl) {
 	shader = glsl;
@@ -66,7 +62,7 @@ function go(glsl) {
 		}
 	`);
 	gl.compileShader(fragmentShader);
-	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader));
+	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), filename);
 
 	program = gl.createProgram()
 	gl.attachShader(program, vertexShader);
@@ -93,7 +89,13 @@ function reload() {
 		setTimeout(reload, 200);
 		if (shader !== this.responseText) {
 			console.log("loaded");
-			go(this.responseText);
+			try {
+				document.querySelector("#err").innerText = "";
+				go(this.responseText);
+			} catch (e) {
+				document.querySelector("#err").innerText = e;
+			}
+
 		}
 	}
 	xhr.send();
