@@ -21,14 +21,17 @@ canvas.addEventListener("drag", function (e) {
 	}
 });
 
+/*
 var xhr = new XMLHttpRequest();
 xhr.open("GET", filename, true);
 //xhr.responseType = "blob";
 xhr.onload = function (e) {
 	if (this.status != 200) throw new Error("Error loading script");
 	go(this.responseText);
+	tick();
 }
 xhr.send();
+*/
 
 function go(glsl) {
 	shader = glsl;
@@ -78,8 +81,7 @@ function go(glsl) {
 	gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
 	gl.enableVertexAttribArray(0);
 
-	tick();
-	reload();
+	window.requestAnimationFrame(tick);
 }
 
 function reload() {
@@ -90,16 +92,14 @@ function reload() {
 		if (this.status != 200) throw new Error("Error loading script");
 		setTimeout(reload, 200);
 		if (shader !== this.responseText) {
-			console.log("reloaded");
+			console.log("loaded");
 			go(this.responseText);
 		}
 	}
 	xhr.send();
 }
 
-
 const T0 = +new Date()/1000;
-
 
 function tick() {
 	gl.viewport(0, 0, canvas.width, canvas.height);
@@ -110,5 +110,7 @@ function tick() {
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 	window.requestAnimationFrame(tick);
 }
+
+reload();
 
 </script>
