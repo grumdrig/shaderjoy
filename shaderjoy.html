@@ -3,13 +3,15 @@
 <div><i>Shaderjoy</i></div>
 <canvas draggable=true></canvas>
 <div id=status></div>
-<div><input name="s" type=text></input></div>
+<table id=list></table>
 <div id=err></div>
 <form>
 <style>
 	canvas {XXborder: solid 1px blue}
 	input { font-size: 14px; }
 	#err { color: #800; }
+	#list td { color: blue; cursor: default; background-color: #ffe; }
+	#list tr.selected td { font-weight: bold }
 </style>
 <script>
 
@@ -18,9 +20,9 @@ canvas.width = 640;
 canvas.height = 480;
 let gl = canvas.getContext("webgl2");
 let program;
-let shader = "";
+let SHADERS = {};
 let filename = window.location.search.substring(3) || "default.glsl";
-document.querySelector("input").value = filename;
+//document.querySelector("input").value = filename;
 
 canvas.addEventListener("drag", function (e) {
 	if (e.clientX > 0 && e.clientY > 0) {
@@ -30,8 +32,6 @@ canvas.addEventListener("drag", function (e) {
 });
 
 function go(glsl) {
-	shader = glsl;
-
 	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
 	gl.shaderSource(vertexShader, `#version 300 es
 		precision highp float;
@@ -80,25 +80,62 @@ function go(glsl) {
 	window.requestAnimationFrame(tick);
 }
 
-function reload() {
-	var xhr = new XMLHttpRequest();
-	xhr.open("GET", filename + "?now=" + +new Date(), true);
-	//xhr.responseType = "blob";
-	xhr.onload = function (e) {
-		if (this.status != 200) throw new Error("Error loading script");
-		setTimeout(reload, 200);
-		if (shader !== this.responseText) {
-			console.log("loaded");
-			try {
-				document.querySelector("#err").innerText = "";
-				go(this.responseText);
-			} catch (e) {
-				document.querySelector("#err").innerText = e;
-			}
+function reload(firstTime) {
+	var ls = new XMLHttpRequest();
+	ls.open("GET", "./?now=" + +new Date(), true);
+	for (let i in SHADERS) SHADERS[i].request = null;
+	ls.onload = function (e) {
+		if (this.status != 200) throw new Error("Error loading directory listing");
+		let re = /href="(.+\.glsl)"/g, match;
+		while (match = re.exec(this.responseText)) {
+			let filename = match[1];
 
+			let link = SHADERS[filename];
+			if (!link) {
+				link = SHADERS[filename] = document.createElement('tr');
+				link.filename = filename;
+				const td = document.createElement("td");
+				link.appendChild(td);
+				td.innerText = filename;
+				link.onclick = function (e) { this.currentContents = 0; }  // Cause a reload
+				document.querySelector("#list").appendChild(link);
+			}
+			link.request = new XMLHttpRequest();
+			link.request.open("GET", filename + "?now=" + +new Date(), true);
+			//link.request.responseType = "blob";
+			link.request.onload = function (e) {
+				if (this.status != 200) throw new Error("Error loading script");
+				if (link.currentContents !== this.responseText) {
+					console.log("Loading", filename);
+					link.currentContents = this.responseText;
+					// TODO: should only go() the newest file if firstTime is set.
+					try {
+						document.querySelector("#err").innerText = "";
+						for (let i in SHADERS) {
+							if (SHADERS[i] === link) {
+								SHADERS[i].classList.add("selected");
+							} else {
+								SHADERS[i].classList.remove("selected");
+							}
+						}
+						go(this.responseText);
+					} catch (e) {
+						document.querySelector("#err").innerText = e;
+					}
+
+				}
+			}
+			link.request.send();
 		}
+		for (let i in SHADERS) {
+			if (!SHADERS[i].request) {
+				SHADERS[i].parentElement.removeChild(SHADERS[i]);
+				delete SHADERS[i];
+			}
+		}
+ 		setTimeout(reload, 200);
 	}
-	xhr.send();
+	ls.send();
 }
 
 const T0 = +new Date()/1000;
@@ -113,6 +150,6 @@ function tick() {
 	window.requestAnimationFrame(tick);
 }
 
-reload();
+reload(true);
 
 </script>
