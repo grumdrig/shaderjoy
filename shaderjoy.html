@@ -117,6 +117,7 @@ function reload(firstTime) {
 	for (let i in SHADERS) SHADERS[i].request = null;
 	ls.onload = function (e) {
 		if (this.status != 200) throw new Error("Error loading directory listing");
+		let newest;
 		let re = /href="(.+\.glsl)"/g, match;
 		while (match = re.exec(this.responseText)) {
 			let filename = match[1];
@@ -137,7 +138,13 @@ function reload(firstTime) {
 			link.request.onload = function (e) {
 				if (this.status != 200) throw new Error("Error loading script");
 				if (link.currentContents !== this.responseText) {
-					console.log("Loading", filename);
+					link.lastModified = +new Date(this.getResponseHeader("Last-Modified"));
+					/* Race condition here!
+					if (firstTime && newest && newest >= link.lastModified)
+						return;
+					newest = link.lastModified;
+					*/
+					console.log("Loading", filename, lastModified);
 					link.currentContents = this.responseText;
 					// TODO: should only go() the newest file if firstTime is set.
 					try {
