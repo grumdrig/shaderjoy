@@ -3,7 +3,7 @@
 <title>Shaderjoy</title>
 </head>
 <body>
-<div id=title><i>Shaderjoy</i></div>
+<div id=title>Shaderjoy</div>
 <canvas draggable=true></canvas>
 <div id=status>
 	<span id="rewind"></span>
@@ -11,7 +11,7 @@
 	<span id="fps"></span> fps
 </div>
 <div id=list></div>
-<div id=err></div>
+<pre id=err></pre>
 <form>
 <style>
 	input { font-size: 14px; }
@@ -32,7 +32,8 @@
 		font-weight: bold;
 		margin-bottom: 10px;
 	}
-	#title { font-family: Bookman; font-size: 20px; }
+	#list { margin-bottom: 10px; }
+	#title { font-family: Bookman; font-size: 20px; font-style: italic; }
 	body { background-color: #d2d0d2; margin-left: 100px; }
 	#rewind, #pause { padding: 4px; cursor: default; }
 	#rewind:before { content: "\21e4" }
@@ -41,15 +42,15 @@
 </style>
 <script>
 
-let canvas = document.querySelector("canvas");
+function $(s) { return document.querySelector(s); }
+
+let canvas = $("canvas");
 canvas.width = 500;
 canvas.height = 281;
 canvas.iMouse = [0,0,0,0];
 let gl = canvas.getContext("webgl2");
 let program;
 let SHADERS = {};
-let filename = window.location.search.substring(3) || "default.glsl";
-//document.querySelector("input").value = filename;
 
 canvas.addEventListener("drag", function (e) {
 	if (e.clientX > 0 && e.clientY > 0) {
@@ -74,7 +75,7 @@ canvas.addEventListener("mousedown", function (e) {
 	canvas.iMouse[3] = rect.height - 1 - (e.clientY - rect.top);
 });
 
-function go(glsl) {
+function go(link) {
 	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
 	gl.shaderSource(vertexShader, `#version 300 es
 		precision highp float;
@@ -105,14 +106,14 @@ function go(glsl) {
 		//uniform vec4      iDate;                 // (year, month, day, time in seconds)
 
 		#line 1
-		${glsl}
+		${link.currentContents}
 
 		void main() {
 			mainImage(FragColor, gl_FragCoord.xy);
 		}
 	`);
 	gl.compileShader(fragmentShader);
-	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), filename);
+	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), link.filename);
 
 	program = gl.createProgram()
 	gl.attachShader(program, vertexShader);
@@ -137,7 +138,7 @@ function reload(firstTime) {
 	ls.onload = function (e) {
 		if (this.status != 200) throw new Error("Error loading directory listing");
 		let newest;
-		let re = /href="(.+\.glsl)"/g, match;
+		let re = /href="(.+)\.glsl"/g, match;
 		while (match = re.exec(this.responseText)) {
 			let filename = match[1];
 
@@ -148,25 +149,32 @@ function reload(firstTime) {
 				link.innerHTML = filename;
 				link.classList.add("item");
 				link.onclick = function (e) { this.currentContents = 0; }  // Cause a reload
-				document.querySelector("#list").appendChild(link);
+				$("#list").appendChild(link);
 			}
 			link.request = new XMLHttpRequest();
-			link.request.open("GET", filename + "?now=" + +new Date(), true);
+			link.request.open("GET", filename + ".glsl?now=" + +new Date(), true);
 			//link.request.responseType = "blob";
 			link.request.onload = function (e) {
 				if (this.status != 200) throw new Error("Error loading script");
 				if (link.currentContents !== this.responseText) {
 					link.lastModified = +new Date(this.getResponseHeader("Last-Modified"));
-					/* Race condition here!
-					if (firstTime && newest && newest >= link.lastModified)
-						return;
-					newest = link.lastModified;
-					*/
 					console.log("Loading", filename, link.lastModified);
 					link.currentContents = this.responseText;
-					// TODO: should only go() the newest file if firstTime is set.
+
+					if (firstTime) {
+						// This first time, just load the most recently modified file
+						for (let i in SHADERS) {
+							if (!SHADERS[i].currentContents)
+								return;  // Still loading
+							if (SHADERS[i].lastModified > link.lastModified) {
+								link = SHADERS[i];
+							}
+						}
+						$("#title").innerText = link.filename;
+					}
+
 					try {
-						document.querySelector("#err").innerText = "";
+						$("#err").innerText = "";
 						for (let i in SHADERS) {
 							if (SHADERS[i] === link) {
 								SHADERS[i].classList.add("selected");
@@ -174,9 +182,11 @@ function reload(firstTime) {
 								SHADERS[i].classList.remove("selected");
 							}
 						}
-						go(this.responseText);
+						go(link);
+						$("#title").innerText = link.filename;
 					} catch (e) {
-						document.querySelector("#err").innerText = e;
+						let numbered = link.currentContents.split('\n').map((c,i)=>i+1 + ": " + c).join('\n');
+						$("#err").innerText = `Error compiling "${link.filename}":\n${e}\n${numbered}`;
 					}
 
 				}
@@ -195,7 +205,7 @@ function reload(firstTime) {
 }
 
 let T0, T1 = 0, DT = 0;
-document.querySelector("#rewind").onclick = rewind;
+$("#rewind").onclick = rewind;
 function rewind() { T0 = null; }
 rewind();
 
@@ -206,8 +216,8 @@ function tick() {
 	const now = (clock - T0)/1000;
 	const dk = .99;
 	DT = DT * dk + (1-dk) * (clock - T1);
-	document.querySelector("#clock").innerText = now.toFixed(2);
-	document.querySelector("#fps").innerText = (60 / DT).toFixed(2);
+	$("#clock").innerText = now.toFixed(2);
+	$("#fps").innerText = (60 / DT).toFixed(2);
 	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
 	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
