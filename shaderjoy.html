@@ -8,6 +8,7 @@
 <div id=status>
 	<span id="rewind"></span>
 	<span id="clock"></span>
+	<span id="fps"></span> fps
 </div>
 <div id=list></div>
 <div id=err></div>
@@ -36,6 +37,7 @@
 	#rewind, #pause { padding: 4px; cursor: default; }
 	#rewind:before { content: "\21e4" }
 	#pause:before { content: "\23f8" }
+	#status span { margin-left: 10px; }
 </style>
 <script>
 
@@ -192,20 +194,26 @@ function reload(firstTime) {
 	ls.send();
 }
 
-let T0;
+let T0, T1 = 0, DT = 0;
 document.querySelector("#rewind").onclick = rewind;
-function rewind() { T0 = +new Date()/1000; }
+function rewind() { T0 = null; }
 rewind();
 
 function tick() {
+	let clock = performance.now();
 	gl.viewport(0, 0, canvas.width, canvas.height);
-	const now = +new Date()/1000 - T0;
+	if (T0 === null) T0 = clock;
+	const now = (clock - T0)/1000;
+	const dk = .99;
+	DT = DT * dk + (1-dk) * (clock - T1);
 	document.querySelector("#clock").innerText = now.toFixed(2);
+	document.querySelector("#fps").innerText = (60 / DT).toFixed(2);
 	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
 	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 	window.requestAnimationFrame(tick);
+	T1 = clock;
 }
 
 reload(true);
