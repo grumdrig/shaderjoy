@@ -16,8 +16,9 @@
 <script>
 
 let canvas = document.querySelector("canvas");
-canvas.width = 640;
-canvas.height = 480;
+canvas.width = 500;
+canvas.height = 281;
+canvas.iMouse = [0,0,0,0];
 let gl = canvas.getContext("webgl2");
 let program;
 let SHADERS = {};
@@ -29,6 +30,18 @@ canvas.addEventListener("drag", function (e) {
 		canvas.width = e.x - canvas.offsetLeft;
 		canvas.height = e.y - canvas.offsetTop;
 	}
+});
+
+canvas.addEventListener("mousemove", function (e) {
+	var rect = canvas.getBoundingClientRect();
+	canvas.iMouse[0] = e.clientX - rect.left;
+	canvas.iMouse[1] = e.clientY - rect.top;
+});
+
+canvas.addEventListener("mousedown", function (e) {
+	var rect = canvas.getBoundingClientRect();
+	canvas.iMouse[2] = e.clientX - rect.left;
+	canvas.iMouse[3] = e.clientY - rect.top;
 });
 
 function go(glsl) {
@@ -51,8 +64,15 @@ function go(glsl) {
 
 		out vec4 FragColor;
 
-		uniform vec3  iResolution;
-		uniform float iGlobalTime;
+		uniform vec3      iResolution;           // viewport resolution (in pixels)
+		uniform float     iGlobalTime;           // shader playback time (in seconds)
+		//uniform float     iTimeDelta;            // render time (in seconds)
+		//uniform int       iFrame;                // shader playback frame
+		//uniform float     iChannelTime[4];       // channel playback time (in seconds)
+		//uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
+		uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
+		//uniform samplerXX iChannel0..3;          // input channel. XX = 2D/Cube
+		//uniform vec4      iDate;                 // (year, month, day, time in seconds)
 
 		#line 1
 		${glsl}
@@ -146,6 +166,7 @@ function tick() {
 	document.querySelector("#status").innerText = now.toFixed(2);
 	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
+	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 	window.requestAnimationFrame(tick);
 }
