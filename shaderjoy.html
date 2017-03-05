@@ -5,20 +5,33 @@
 <body>
 <div id=title><i>Shaderjoy</i></div>
 <canvas draggable=true></canvas>
-<div id=status></div>
-<table id=list></table>
+<div id=status><span id="rewind"></span><span id="clock"></span></div>
+<div id=list></div>
 <div id=err></div>
 <form>
 <style>
-	canvas {XXborder: solid 1px blue}
 	input { font-size: 14px; }
 	#err { color: #800; }
-	#list td { color: blue; cursor: default; background-color: #ffe; }
-	#list tr.selected td { font-weight: bold }
-	div, td { font-family: Tahoma; font-size: 14px; }
-	#status, #title { font-weight: bold; }
+	.item {
+		color: blue;
+		cursor: default;
+		background-color: #ffe;
+		margin: 4px;
+		padding: 4px;
+	}
+	.item:before {
+		content: "\2602\0020";
+	}
+	.selected { font-weight: bold }
+	div { font-family: Tahoma; font-size: 14px; }
+	#status, #title {
+		font-weight: bold;
+		margin-bottom: 10px;
+	}
 	#title { font-family: Bookman; font-size: 20px; }
 	body { background-color: #d2d0d2; margin-left: 100px; }
+	#rewind { padding: 4px; cursor: default; }
+	#rewind:before { content: "\21e4" }
 </style>
 <script>
 
@@ -124,11 +137,10 @@ function reload(firstTime) {
 
 			let link = SHADERS[filename];
 			if (!link) {
-				link = SHADERS[filename] = document.createElement('tr');
+				link = SHADERS[filename] = document.createElement('span');
 				link.filename = filename;
-				const td = document.createElement("td");
-				link.appendChild(td);
-				td.innerText = filename;
+				link.innerHTML = filename;
+				link.classList.add("item");
 				link.onclick = function (e) { this.currentContents = 0; }  // Cause a reload
 				document.querySelector("#list").appendChild(link);
 			}
@@ -144,7 +156,7 @@ function reload(firstTime) {
 						return;
 					newest = link.lastModified;
 					*/
-					console.log("Loading", filename, lastModified);
+					console.log("Loading", filename, link.lastModified);
 					link.currentContents = this.responseText;
 					// TODO: should only go() the newest file if firstTime is set.
 					try {
@@ -176,12 +188,15 @@ function reload(firstTime) {
 	ls.send();
 }
 
-const T0 = +new Date()/1000;
+let T0;
+document.querySelector("#rewind").onclick = rewind;
+function rewind() { T0 = +new Date()/1000; }
+rewind();
 
 function tick() {
 	gl.viewport(0, 0, canvas.width, canvas.height);
 	const now = +new Date()/1000 - T0;
-	document.querySelector("#status").innerText = now.toFixed(2);
+	document.querySelector("#clock").innerText = now.toFixed(2);
 	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
 	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
