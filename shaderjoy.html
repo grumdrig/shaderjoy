@@ -1,6 +1,9 @@
 <!doctype html>
+<head>
 <title>Shaderjoy</title>
-<div><i>Shaderjoy</i></div>
+</head>
+<body>
+<div id=title><i>Shaderjoy</i></div>
 <canvas draggable=true></canvas>
 <div id=status></div>
 <table id=list></table>
@@ -12,6 +15,10 @@
 	#err { color: #800; }
 	#list td { color: blue; cursor: default; background-color: #ffe; }
 	#list tr.selected td { font-weight: bold }
+	div, td { font-family: Tahoma; font-size: 14px; }
+	#status, #title { font-weight: bold; }
+	#title { font-family: Bookman; font-size: 20px; }
+	body { background-color: #d2d0d2; margin-left: 100px; }
 </style>
 <script>
 
@@ -178,3 +185,4 @@ function tick() {
 reload(true);
 
 </script>
+</body>
