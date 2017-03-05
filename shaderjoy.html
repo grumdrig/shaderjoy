@@ -5,7 +5,10 @@
 <body>
 <div id=title><i>Shaderjoy</i></div>
 <canvas draggable=true></canvas>
-<div id=status><span id="rewind"></span><span id="clock"></span></div>
+<div id=status>
+	<span id="rewind"></span>
+	<span id="clock"></span>
+</div>
 <div id=list></div>
 <div id=err></div>
 <form>
@@ -30,8 +33,9 @@
 	}
 	#title { font-family: Bookman; font-size: 20px; }
 	body { background-color: #d2d0d2; margin-left: 100px; }
-	#rewind { padding: 4px; cursor: default; }
+	#rewind, #pause { padding: 4px; cursor: default; }
 	#rewind:before { content: "\21e4" }
+	#pause:before { content: "\23f8" }
 </style>
 <script>
 
