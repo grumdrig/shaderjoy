@@ -32,16 +32,20 @@ canvas.addEventListener("drag", function (e) {
 	}
 });
 
+// This isn't quite the way shadertoy decides mouse positions, regarding
+// clicks, but since dragging resizes, just going with this scheme, for the
+// time being at least.
+
 canvas.addEventListener("mousemove", function (e) {
 	var rect = canvas.getBoundingClientRect();
 	canvas.iMouse[0] = e.clientX - rect.left;
-	canvas.iMouse[1] = e.clientY - rect.top;
+	canvas.iMouse[1] = rect.height - 1 - (e.clientY - rect.top);
 });
 
 canvas.addEventListener("mousedown", function (e) {
 	var rect = canvas.getBoundingClientRect();
 	canvas.iMouse[2] = e.clientX - rect.left;
-	canvas.iMouse[3] = e.clientY - rect.top;
+	canvas.iMouse[3] = rect.height - 1 - (e.clientY - rect.top);
 });
 
 function go(glsl) {
