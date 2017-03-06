@@ -49,11 +49,11 @@ let canvas = $("canvas");
 canvas.width = 500;
 canvas.height = 281;
 canvas.iMouse = [0,0,0,0];
-let gl = canvas.getContext("webgl");
+let gl = canvas.getContext("webgl2");
 let program;
 let SHADERS = {};
 
-let ext = gl.getExtension('EXT_disjoint_timer_query');
+let ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
 canvas.addEventListener("drag", function (e) {
 	if (e.clientX > 0 && e.clientY > 0) {
@@ -80,10 +80,10 @@ canvas.addEventListener("mousedown", function (e) {
 
 function go(link) {
 	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	gl.shaderSource(vertexShader, `
+	gl.shaderSource(vertexShader, `#version 300 es
 		precision highp float;
 
-		attribute vec2 aPosition;
+		in vec2 aPosition;
 
 		void main() {
 			gl_Position = vec4(aPosition, 0, 1);
@@ -93,7 +93,7 @@ function go(link) {
 	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vertexShader));
 
 	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, `
+	gl.shaderSource(fragmentShader, `#version 300 es
 		precision highp float;
 
 		uniform vec3      iResolution;           // viewport resolution (in pixels)
@@ -106,8 +106,10 @@ function go(link) {
 		#line 1
 		${link.currentContents}
 
+		out vec4 FragColor;
+
 		void main() {
-			mainImage(gl_FragColor, gl_FragCoord.xy);
+			mainImage(FragColor, gl_FragCoord.xy);
 		}
 	`);
 	gl.compileShader(fragmentShader);
@@ -234,28 +236,28 @@ function tick() {
 
 	if (ext && ext.query && (!ext.last || now - ext.last > 0.1)) {
 		ext.last = now;
-		const available = ext.getQueryObjectEXT(ext.query, ext.QUERY_RESULT_AVAILABLE_EXT);
+		const available = gl.getQueryParameter(ext.query, gl.QUERY_RESULT_AVAILABLE);
 		const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
 
 		if (available && !disjoint) {
-			let timeElapsed = ext.getQueryObjectEXT(ext.query, ext.QUERY_RESULT_EXT) / 1e6;
+			let timeElapsed = gl.getQueryParameter(ext.query, gl.QUERY_RESULT) / 1e6;
 			$("#timer").innerText = timeElapsed.toFixed(4);
-			ext.deleteQueryEXT(ext.query);
+			gl.deleteQuery(ext.query);
 			ext.query = null;
 		}
 	}
 
 	let query;
 	if (ext && !ext.query) {
-		query = ext.createQueryEXT();
-		ext.beginQueryEXT(ext.TIME_ELAPSED_EXT, query);
+		query = gl.createQuery();
+		gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
 	}
 
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 
 	if (query) {
 		ext.query = query;
-		ext.endQueryEXT(ext.TIME_ELAPSED_EXT);
+		gl.endQuery(ext.TIME_ELAPSED_EXT);
 	}
 
 	window.requestAnimationFrame(tick);
