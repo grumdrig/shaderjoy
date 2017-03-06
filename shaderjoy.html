@@ -9,6 +9,7 @@
 	<span id="rewind"></span>
 	<span id="clock"></span>
 	<span id="fps"></span> fps
+	<span id="timer">?</span> msec
 </div>
 <div id=list></div>
 <pre id=err></pre>
@@ -48,9 +49,11 @@ let canvas = $("canvas");
 canvas.width = 500;
 canvas.height = 281;
 canvas.iMouse = [0,0,0,0];
-let gl = canvas.getContext("webgl2");
+let gl = canvas.getContext("webgl");
 let program;
 let SHADERS = {};
+
+let ext = gl.getExtension('EXT_disjoint_timer_query');
 
 canvas.addEventListener("drag", function (e) {
 	if (e.clientX > 0 && e.clientY > 0) {
@@ -77,10 +80,10 @@ canvas.addEventListener("mousedown", function (e) {
 
 function go(link) {
 	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	gl.shaderSource(vertexShader, `#version 300 es
+	gl.shaderSource(vertexShader, `
 		precision highp float;
 
-		in vec2 aPosition;
+		attribute vec2 aPosition;
 
 		void main() {
 			gl_Position = vec4(aPosition, 0, 1);
@@ -90,10 +93,8 @@ function go(link) {
 	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vertexShader));
 
 	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, `#version 300 es
+	gl.shaderSource(fragmentShader, `
 		precision highp float;
-
-		out vec4 FragColor;
 
 		uniform vec3      iResolution;           // viewport resolution (in pixels)
 		uniform float     iGlobalTime;           // shader playback time (in seconds)
@@ -109,7 +110,7 @@ function go(link) {
 		${link.currentContents}
 
 		void main() {
-			mainImage(FragColor, gl_FragCoord.xy);
+			mainImage(gl_FragColor, gl_FragCoord.xy);
 		}
 	`);
 	gl.compileShader(fragmentShader);
@@ -205,25 +206,58 @@ function reload(firstTime) {
 }
 
 let T0, T1 = 0, DT = 0;
+let FRAME = 0;
 $("#rewind").onclick = rewind;
 function rewind() { T0 = null; }
 rewind();
 
+let timer = 0;
+
 function tick() {
 	let clock = performance.now();
 	gl.viewport(0, 0, canvas.width, canvas.height);
-	if (T0 === null) T0 = clock;
+	if (T0 === null) {
+		T0 = clock;
+		FRAME = 0;
+	}
+	FRAME++;
 	const now = (clock - T0)/1000;
 	const dk = .99;
-	DT = DT * dk + (1-dk) * (clock - T1);
+	DT = DT * dk + (1-dk) * (clock - T1)/1000;
 	$("#clock").innerText = now.toFixed(2);
-	$("#fps").innerText = (60 / DT).toFixed(2);
+	$("#fps").innerText = (1 / DT).toFixed(2);
 	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
 	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
-	window.requestAnimationFrame(tick);
 	T1 = clock;
+
+	if (ext && ext.query && (!ext.last || now - ext.last > 0.1)) {
+		ext.last = now;
+		const available = ext.getQueryObjectEXT(ext.query, ext.QUERY_RESULT_AVAILABLE_EXT);
+		const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
+
+		if (available && !disjoint) {
+			let timeElapsed = ext.getQueryObjectEXT(ext.query, ext.QUERY_RESULT_EXT) / 1e6;
+			$("#timer").innerText = timeElapsed.toFixed(4);
+			ext.deleteQueryEXT(ext.query);
+			ext.query = null;
+		}
+	}
+
+	let query;
+	if (ext && !ext.query) {
+		query = ext.createQueryEXT();
+		ext.beginQueryEXT(ext.TIME_ELAPSED_EXT, query);
+	}
+
+	gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+	if (query) {
+		ext.query = query;
+		ext.endQueryEXT(ext.TIME_ELAPSED_EXT);
+	}
+
+	window.requestAnimationFrame(tick);
 }
 
 reload(true);
