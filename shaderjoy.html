@@ -98,13 +98,10 @@ function go(link) {
 
 		uniform vec3      iResolution;           // viewport resolution (in pixels)
 		uniform float     iGlobalTime;           // shader playback time (in seconds)
-		//uniform float     iTimeDelta;            // render time (in seconds)
-		//uniform int       iFrame;                // shader playback frame
-		//uniform float     iChannelTime[4];       // channel playback time (in seconds)
-		//uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
+		uniform float     iTimeDelta;            // render time (in seconds)
+		uniform int       iFrame;                // shader playback frame
 		uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
-		//uniform samplerXX iChannel0..3;          // input channel. XX = 2D/Cube
-		//uniform vec4      iDate;                 // (year, month, day, time in seconds)
+		uniform vec4      iDate;                 // (year, month, day, time in seconds)
 
 		#line 1
 		${link.currentContents}
@@ -226,9 +223,13 @@ function tick() {
 	DT = DT * dk + (1-dk) * (clock - T1)/1000;
 	$("#clock").innerText = now.toFixed(2);
 	$("#fps").innerText = (1 / DT).toFixed(2);
-	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
+	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
+	gl.uniform1f(gl.getUniformLocation(program, "iTimeDelta"), DT);
+	gl.uniform1i(gl.getUniformLocation(program, "iFrame"), FRAME);
 	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
+	let today = new Date();
+	gl.uniform4f(gl.getUniformLocation(program, "iDate"), today.getFullYear(), today.getMonth(), today.getDay(), +today);
 	T1 = clock;
 
 	if (ext && ext.query && (!ext.last || now - ext.last > 0.1)) {
