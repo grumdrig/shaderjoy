@@ -7,9 +7,17 @@
 <canvas draggable=true></canvas>
 <div id=status>
 	<span id="rewind"></span>
+	<span id="pause">&#10073;&#10073;</span>
 	<span id="clock"></span>
 	<span id="fps"></span> fps
 	<span id="timer">?</span> msec
+	Mouse:
+	<select id="mouseaction">
+		<option value="interact">Interact</option>
+		<option value="hyperinteract">Hyperinteract</option>
+		<option value="resize">Resize</option>
+		<option value="getcolor">Get color</option>
+	</select>
 </div>
 <div id=list></div>
 <pre id=err></pre>
@@ -36,47 +44,91 @@
 	#list { margin-bottom: 10px; }
 	#title { font-family: Bookman; font-size: 20px; font-style: italic; }
 	body { background-color: #d2d0d2; margin-left: 100px; }
-	#rewind, #pause { padding: 4px; cursor: default; }
+	#rewind, #pause { cursor: default; width: 10px; display: inline-block; }
 	#rewind:before { content: "\21e4" }
-	#pause:before { content: "\23f8" }
 	#status span { margin-left: 10px; }
 </style>
 <script>
 
 function $(s) { return document.querySelector(s); }
 
+function mouseaction() { return $("#mouseaction").value }
+
 let canvas = $("canvas");
 canvas.width = 500;
 canvas.height = 281;
 canvas.iMouse = [0,0,0,0];
-let gl = canvas.getContext("webgl2");
+let gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
 let program;
 let SHADERS = {};
 
 let ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
 canvas.addEventListener("drag", function (e) {
-	if (e.clientX > 0 && e.clientY > 0) {
-		canvas.width = e.x - canvas.offsetLeft;
-		canvas.height = e.y - canvas.offsetTop;
+	if (mouseaction() == "resize") {
+		if (e.clientX > 0 && e.clientY > 0) {
+			canvas.width = e.x - canvas.offsetLeft;
+			canvas.height = e.y - canvas.offsetTop;
+		}
+	} else if (mouseaction() === "interact") {
+		if (e.clientX > 0 && e.clientY > 0) {
+			[canvas.iMouse[0], canvas.iMouse[1]] = mousePos(e);
+		}
 	}
+
 });
 
 // This isn't quite the way shadertoy decides mouse positions, regarding
 // clicks, but since dragging resizes, just going with this scheme, for the
 // time being at least.
 
+function mousePos(e) {
+	let rect = canvas.getBoundingClientRect();
+	return [e.clientX - rect.left,
+			rect.height - 1 - (e.clientY - rect.top)];
+}
+
 canvas.addEventListener("mousemove", function (e) {
-	var rect = canvas.getBoundingClientRect();
-	canvas.iMouse[0] = e.clientX - rect.left;
-	canvas.iMouse[1] = rect.height - 1 - (e.clientY - rect.top);
+	let [mx, my] = mousePos(e);
+	if (mouseaction() === "getcolor") {
+		let p = new Uint8Array(4);
+		gl.readPixels(mx, my, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
+	    $("body").style.backgroundColor = `rgb(${p[0]},${p[1]},${p[2]})`;
+	    $("body").style.color = contrastingColor(p[0], p[1], p[2]);
+	} else if (mouseaction() === "hyperinteract") {
+		canvas.iMouse[0] = mx;
+		canvas.iMouse[1] = my;
+	}
 });
 
 canvas.addEventListener("mousedown", function (e) {
-	var rect = canvas.getBoundingClientRect();
-	canvas.iMouse[2] = e.clientX - rect.left;
-	canvas.iMouse[3] = rect.height - 1 - (e.clientY - rect.top);
+	if (mouseaction() == "interact") {
+		[canvas.iMouse[0], canvas.iMouse[1]] = [canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
+	} else if (mouseaction() == "hyperinteract") {
+		[canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
+	}
 });
+
+canvas.addEventListener("dragend", function (e) {
+	console.log("dragend");
+	if (mouseaction() == "interact") {
+		[canvas.iMouse[2], canvas.iMouse[3]] = [-canvas.iMouse[2], -canvas.iMouse[3]];
+	}
+});
+
+function contrastingColor(r, g, b) {
+	const abs = Math.abs, min = Math.min;
+	const dr = abs(r - 128);
+	const dg = abs(g - 128);
+	const db = abs(b - 128);
+	if (dr < min(dg, db)) {
+		return `rgb(${r < 128 ? 255 : 0},${255-g},${255-b})`;
+	} else if (dg < db) {
+		return `rgb(${255-r},${g < 128 ? 255 : 0},${255-b})`;
+	} else {
+		return `rgb(${255-r},${255-g},${b < 128 ? 255 : 0})`;
+	}
+}
 
 function go(link) {
 	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -204,62 +256,78 @@ function reload(firstTime) {
 	ls.send();
 }
 
+let PAUSED = false;
 let T0, T1 = 0, DT = 0;
 let FRAME = 0;
 $("#rewind").onclick = rewind;
-function rewind() { T0 = null; }
+function rewind() {
+	T0 = null;
+	if (PAUSED) PAUSED = 0;
+}
 rewind();
+
+$("#pause").onclick = function (e) {
+	if (PAUSED !== false) {
+		T0 = performance.now() - PAUSED;
+		PAUSED = false;
+	} else {
+		PAUSED = T1 - T0;
+	}
+	this.innerHTML = PAUSED ? "&#9658;" : "&#10073;&#10073;";
+}
+
 
 let timer = 0;
 
 function tick() {
-	let clock = performance.now();
-	gl.viewport(0, 0, canvas.width, canvas.height);
-	if (T0 === null) {
-		T0 = clock;
-		FRAME = 0;
-	}
-	FRAME++;
-	const now = (clock - T0)/1000;
-	const dk = .99;
-	DT = DT * dk + (1-dk) * (clock - T1)/1000;
-	$("#clock").innerText = now.toFixed(2);
-	$("#fps").innerText = (1 / DT).toFixed(2);
-	gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
-	gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
-	gl.uniform1f(gl.getUniformLocation(program, "iTimeDelta"), DT);
-	gl.uniform1i(gl.getUniformLocation(program, "iFrame"), FRAME);
-	gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
-	let today = new Date();
-	gl.uniform4f(gl.getUniformLocation(program, "iDate"), today.getFullYear(), today.getMonth(), today.getDay(), +today);
-	T1 = clock;
+	if (PAUSED == false) {
+		let clock = performance.now();
+		gl.viewport(0, 0, canvas.width, canvas.height);
+		if (T0 === null) {
+			T0 = clock;
+			FRAME = 0;
+		}
+		FRAME++;
+		const now = (clock - T0)/1000;
+		const dk = .99;
+		DT = DT * dk + (1-dk) * (clock - T1)/1000;
+		$("#clock").innerText = now.toFixed(2);
+		$("#fps").innerText = (1 / DT).toFixed(2);
+		gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
+		gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
+		gl.uniform1f(gl.getUniformLocation(program, "iTimeDelta"), DT);
+		gl.uniform1i(gl.getUniformLocation(program, "iFrame"), FRAME);
+		gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
+		let today = new Date();
+		gl.uniform4f(gl.getUniformLocation(program, "iDate"), today.getFullYear(), today.getMonth(), today.getDay(), +today);
+		T1 = clock;
 
-	if (ext && ext.query && (!ext.last || now - ext.last > 0.1)) {
-		ext.last = now;
-		const available = gl.getQueryParameter(ext.query, gl.QUERY_RESULT_AVAILABLE);
-		const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
+		if (ext && ext.query && (!ext.last || now - ext.last > 0.1)) {
+			ext.last = now;
+			const available = gl.getQueryParameter(ext.query, gl.QUERY_RESULT_AVAILABLE);
+			const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
 
-		if (available && !disjoint) {
-			let timeElapsed = gl.getQueryParameter(ext.query, gl.QUERY_RESULT) / 1e6;
-			$("#timer").innerText = timeElapsed.toFixed(4);
-			gl.deleteQuery(ext.query);
-			ext.query = null;
+			if (available && !disjoint) {
+				let timeElapsed = gl.getQueryParameter(ext.query, gl.QUERY_RESULT) / 1e6;
+				$("#timer").innerText = timeElapsed.toFixed(4);
+				gl.deleteQuery(ext.query);
+				ext.query = null;
+			}
+		}
+
+		let query;
+		if (ext && !ext.query) {
+			query = gl.createQuery();
+			gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+		}
+
+		gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+		if (query) {
+			ext.query = query;
+			gl.endQuery(ext.TIME_ELAPSED_EXT);
 		}
 	}
-
-	let query;
-	if (ext && !ext.query) {
-		query = gl.createQuery();
-		gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
-	}
-
-	gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-	if (query) {
-		ext.query = query;
-		gl.endQuery(ext.TIME_ELAPSED_EXT);
-	}
-
 	window.requestAnimationFrame(tick);
 }
 

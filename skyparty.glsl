@@ -5,6 +5,7 @@
 // Starfield is based on https://www.shadertoy.com/view/MtB3zW
 
 const float DAY = 30.; // seconds per day
+const float PI = 3.1415926585;
 
 vec3 calcExtinction(float dist) {
 	return exp(dist * vec3(-4.522079564139858e-7, -9.250694574802765e-7, -0.0000018804023511620471));
@@ -58,28 +59,8 @@ float stars(in vec2 x, float numCells, float size, float br) {
 }
 
 vec3 skyColor(in vec3 rd) {
-    float sunAngle = 6.28 * iGlobalTime / DAY;
-	float cs = cos(sunAngle), ss = sin(sunAngle);
-    vec3 sunDirection = normalize(vec3(cs, ss, 0.5));
-
-    // Coordinates to use are the two smallest of the three. There's some distortion at various points
-	vec3 starvec = vec3(rd.x * cs + rd.y * ss,
-                        rd.x * ss - rd.y * cs,
-                        rd.z);
-	vec2 starcoord = starvec.xy;
-	if (abs(starvec.z) < abs(starvec.x)) {
-		starcoord.x = starvec.z + .388;
-		if (abs(starvec.x) < abs(starvec.y)) {
-			starcoord.y = starvec.x + .24;
-		}
-	} else if (abs(starvec.z) < abs(starvec.y)) {
-		starcoord.y = starvec.z + 0.17;
-	}
-	starcoord = asin(starcoord);
-	vec3 starlight = vec3(0);
-	starlight += stars(starcoord,  4., 0.1,   2.0) * vec3(.74, .74, .74);
-	starlight += stars(starcoord,  8., 0.05,  1.0) * vec3(.97, .74, .74);
-	starlight += stars(starcoord, 16., 0.025, 0.5) * vec3(.90, .90, .95);
+    float t = (sin(iGlobalTime)) * PI / 2.;
+    vec3 sunDirection =vec3(0, sin(t), cos(t));
 
 	float cos_theta = dot(rd, sunDirection);
 
@@ -118,18 +99,19 @@ vec3 skyColor(in vec3 rd) {
 
 	vec3 result = vec3(5.839504241943359) * (0.5 * sun_disk + in_scatter);
 
-	float daylight = smoothstep(-0.3, 0.2, sunDirection.y);
-	result += (1. - daylight) * starlight;
-
 	return result;
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 	vec2 p = (2.*fragCoord - iResolution.xy) / iResolution.y;
-    p.y += 0.9;  // Show just a bit of the horizon
+    p.y += 0.7;  // Show just a bit of the horizon
 
-	vec3 rd = normalize(vec3(p, 1.));
+    vec2 coord = 2. * fragCoord.xy / iResolution.xy - 1.;  // on [-1, 1];
+    float up = PI * coord.y / 2.;
+    vec3 fisheye = vec3(cos(up) * sin(coord.x * PI), sin(up), cos(up) * cos(coord.x * PI));
+    vec3 rd = normalize(coord.x < 0. ? vec3(coord, 1.) : fisheye);
 
+/*
     // Adjust view with mouse
     float mouse = 0.;
     // Mouse look commented out because the default mouse value can be somewhere weird
@@ -137,16 +119,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 	mouse -= .3;  // Angle towards the sunrise
 	float cm = cos(mouse), sm = sin(mouse);
     rd = vec3(cm * rd.x - sm * rd.z, rd.y, sm * rd.x + cm * rd.z);
+    */
 
-    if (rd.y > 0.) {
-        fragColor.rgb = skyColor(rd);
-    } else {
-        float sunAngle = 6.28 * iGlobalTime / DAY;
-        float sunheight = sin(sunAngle);
-		float daylight = smoothstep(-0.3, 0.05, sunheight);
-        daylight = max(0., sunheight);
-		//vec3 pos = ro + h * rd;
-        fragColor.rgb = mix(vec3(0, .15, .15), vec3(.1, .4, .1), daylight);
-    }
+    fragColor.rgb = skyColor(rd);
+    fragColor.rgb += vec3(0,1,0) * 1./pow(p.y * 200., 2.);  // horizon line
 	fragColor.a = 1.;
 }
