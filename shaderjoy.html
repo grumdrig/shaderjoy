@@ -14,7 +14,6 @@
 	Mouse:
 	<select id="mouseaction">
 		<option value="interact">Interact</option>
-		<option value="hyperinteract">Hyperinteract</option>
 		<option value="resize">Resize</option>
 		<option value="getcolor">Get color</option>
 	</select>
@@ -95,17 +94,12 @@ canvas.addEventListener("mousemove", function (e) {
 		gl.readPixels(mx, my, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
 	    $("body").style.backgroundColor = `rgb(${p[0]},${p[1]},${p[2]})`;
 	    $("body").style.color = contrastingColor(p[0], p[1], p[2]);
-	} else if (mouseaction() === "hyperinteract") {
-		canvas.iMouse[0] = mx;
-		canvas.iMouse[1] = my;
 	}
 });
 
 canvas.addEventListener("mousedown", function (e) {
 	if (mouseaction() == "interact") {
 		[canvas.iMouse[0], canvas.iMouse[1]] = [canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
-	} else if (mouseaction() == "hyperinteract") {
-		[canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
 	}
 });
 
