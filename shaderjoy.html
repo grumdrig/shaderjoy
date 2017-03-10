@@ -5,6 +5,7 @@
 <body>
 <div id=title>Shaderjoy</div>
 <canvas draggable=true></canvas>
+<canvas id="graph" width=256 height=256></canvas>
 <div id=status>
 	<span id="rewind"></span>
 	<span id="pause">&#10073;&#10073;</span>
@@ -24,6 +25,7 @@
 <style>
 	input { font-size: 14px; }
 	#err { color: #800; }
+	canvas { border: solid 1px black }
 	.item {
 		color: blue;
 		cursor: default;
@@ -52,6 +54,8 @@
 function $(s) { return document.querySelector(s); }
 
 function mouseaction() { return $("#mouseaction").value }
+
+const abs = Math.abs, min = Math.min;
 
 let canvas = $("canvas");
 canvas.width = 500;
@@ -104,14 +108,12 @@ canvas.addEventListener("mousedown", function (e) {
 });
 
 canvas.addEventListener("dragend", function (e) {
-	console.log("dragend");
 	if (mouseaction() == "interact") {
 		[canvas.iMouse[2], canvas.iMouse[3]] = [-canvas.iMouse[2], -canvas.iMouse[3]];
 	}
 });
 
 function contrastingColor(r, g, b) {
-	const abs = Math.abs, min = Math.min;
 	const dr = abs(r - 128);
 	const dg = abs(g - 128);
 	const db = abs(b - 128);
@@ -178,6 +180,8 @@ function go(link) {
 }
 
 function reload(firstTime) {
+		drawGraph();
+
 	var ls = new XMLHttpRequest();
 	ls.open("GET", "./?now=" + +new Date(), true);
 	for (let i in SHADERS) SHADERS[i].request = null;
@@ -321,8 +325,30 @@ function tick() {
 			ext.query = query;
 			gl.endQuery(ext.TIME_ELAPSED_EXT);
 		}
+
 	}
 	window.requestAnimationFrame(tick);
+}
+
+function drawGraph() {
+	let can = $("#graph");
+	let ctx = can.getContext("2d");
+	ctx.fillStyle = "silver";
+	ctx.fillRect(0, 0, can.width, can.height);
+	let p = new Uint8Array(4 * can.width);
+	for (var x = 0; x < can.width; x++) {
+		let t = x / (can.width - 1);
+		gl.readPixels((abs(canvas.iMouse[2]) + (canvas.iMouse[0] - abs(canvas.iMouse[2])) * t) >> 0,
+		 			  (abs(canvas.iMouse[3]) + (canvas.iMouse[1] - abs(canvas.iMouse[3])) * t) >> 0,
+					  1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p, 4 * x);
+	}
+	for (var c = 0; c < 3; ++c) {
+		ctx.strokeStyle = ["#F00","#0F0","#00F"][c];
+		ctx.beginPath();
+		for (var x = 0; x < can.width; ++x)
+			ctx.lineTo(x, 255 - p[c + 4 * x]);
+		ctx.stroke();
+	}
 }
 
 reload(true);
