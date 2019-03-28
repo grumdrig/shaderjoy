@@ -21,13 +21,8 @@ float f(vec2 v) {
                test(v.y * scale) || test(v.y * scale + q.y) || test(v.y * scale - q.y) ? 1.0 : 0.0);
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
-    // vec2 uv = (2.* fragCoord - iResolution.xy ) / iResolution.y;
-	vec2 uv = fragCoord.xy / iResolution.xy;
-    uv = uv * 2. - 1.;
-    uv.x *= iResolution.x / iResolution.y;
-    uv *= 2.0;
+float C(vec2 fragCoord) {
+    vec2 uv = 4. * (2. * fragCoord.xy / iResolution.x - 1.);
 
     float tr = iGlobalTime / 200.0;
 	float r = 3.14159265 * sin(21.0 * tr) * sin(5.0 * tr);
@@ -41,7 +36,16 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     t /= 10.0;
     x0 += 2.0 * sin(33.0 * t) * cos(9.0 * t);
     y0 += 2.0 * sin(40.0 * t) * sin(7.0 * t);
-    float c = f(uv + vec2(x0, y0));
+
+    return f(uv + vec2(x0, y0));
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord)
+{
+    float c = (C(fragCoord                 ) +
+               C(fragCoord + vec2(0.0, 0.5)) +
+               C(fragCoord + vec2(0.5, 0.0)) +
+               C(fragCoord + vec2(0.5, 0.5))) / 4.;
     fragColor = vec4(c,c,c,1);
 }
 
