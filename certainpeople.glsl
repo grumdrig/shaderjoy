@@ -1,14 +1,14 @@
-precision highp float;
-
-
-bool test(float v) {
-    int n = int(floor(v));
-    return ((1 & n & n >> 3 & n >> 6 & n >> 9) == 1);
-}
+// Lives in public at:
+// https://www.shadertoy.com/view/tdjSDh
 
 vec2 rotate(vec2 v, float a){
     return mat2(cos(a),-sin(a),
                 sin(a),cos(a)) * v;
+}
+
+bool test(float v) {
+    int n = int(floor(v));
+    return ((1 & n & n >> 3 & n >> 6 & n >> 9) == 1);
 }
 
 float f(vec2 v) {
@@ -23,6 +23,7 @@ float f(vec2 v) {
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
+    // vec2 uv = (2.* fragCoord - iResolution.xy ) / iResolution.y;
 	vec2 uv = fragCoord.xy / iResolution.xy;
     uv = uv * 2. - 1.;
     uv.x *= iResolution.x / iResolution.y;
