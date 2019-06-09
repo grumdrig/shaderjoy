@@ -1,10 +1,11 @@
 <!doctype html>
 <head>
 <title>Shaderjoy</title>
+<meta charset="utf-8"/>
 </head>
 <body>
 <div id=title>Shaderjoy</div>
-<canvas draggable=true></canvas>
+<canvas></canvas>
 <!-- <canvas id="graph" width=256 height=256></canvas>-->
 <div id=status>
 	<span id="rewind"></span>
@@ -25,7 +26,7 @@
 <style>
 	input { font-size: 14px; }
 	#err { color: #800; }
-	canvas { border: solid 1px black }
+	canvas { border: solid 1px black; background-color: black; }
 	.item {
 		color: blue;
 		cursor: default;
@@ -67,20 +68,6 @@ let SHADERS = {};
 
 let ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
-canvas.addEventListener("drag", function (e) {
-	if (mouseaction() == "resize") {
-		if (e.clientX > 0 && e.clientY > 0) {
-			canvas.width = e.x - canvas.offsetLeft;
-			canvas.height = e.y - canvas.offsetTop;
-		}
-	} else if (mouseaction() === "interact") {
-		if (e.clientX > 0 && e.clientY > 0) {
-			[canvas.iMouse[0], canvas.iMouse[1]] = mousePos(e);
-		}
-	}
-
-});
-
 // This isn't quite the way shadertoy decides mouse positions, regarding
 // clicks, but since dragging resizes, just going with this scheme, for the
 // time being at least.
@@ -98,18 +85,21 @@ canvas.addEventListener("mousemove", function (e) {
 		gl.readPixels(mx, my, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
 	    $("body").style.backgroundColor = `rgb(${p[0]},${p[1]},${p[2]})`;
 	    $("body").style.color = contrastingColor(p[0], p[1], p[2]);
+	} else if (mouseaction() == "interact" && e.buttons) {
+		[canvas.iMouse[0], canvas.iMouse[1]] = mousePos(e);
+	} else if (mouseaction() === "resize" && e.buttons) {
+		let p = mousePos(e);
+		canvas.width += p[0] - canvas.lastMousePosition[0];
+		canvas.height -= p[1] - canvas.lastMousePosition[1];
+		canvas.lastMousePosition = p;
 	}
 });
 
 canvas.addEventListener("mousedown", function (e) {
-	if (mouseaction() == "interact") {
+	if (mouseaction() === "interact") {
 		[canvas.iMouse[0], canvas.iMouse[1]] = [canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
-	}
-});
-
-canvas.addEventListener("dragend", function (e) {
-	if (mouseaction() == "interact") {
-		[canvas.iMouse[2], canvas.iMouse[3]] = [-canvas.iMouse[2], -canvas.iMouse[3]];
+	} else if (mouseaction() === "resize") {
+		canvas.lastMousePosition = mousePos(e);
 	}
 });
 
@@ -145,7 +135,8 @@ function go(link) {
 		precision highp float;
 
 		uniform vec3      iResolution;           // viewport resolution (in pixels)
-		uniform float     iGlobalTime;           // shader playback time (in seconds)
+		uniform float     iTime;                 // shader playback time (in seconds)
+		uniform float     iGlobalTime;           // obsolescent progenitor of iTime
 		uniform float     iTimeDelta;            // render time (in seconds)
 		uniform int       iFrame;                // shader playback frame
 		uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
@@ -292,6 +283,7 @@ function tick() {
 		$("#clock").innerText = now.toFixed(2);
 		$("#fps").innerText = (1 / DT).toFixed(2);
 		gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
+		gl.uniform1f(gl.getUniformLocation(program, "iTime"), now);
 		gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
 		gl.uniform1f(gl.getUniformLocation(program, "iTimeDelta"), DT);
 		gl.uniform1i(gl.getUniformLocation(program, "iFrame"), FRAME);
