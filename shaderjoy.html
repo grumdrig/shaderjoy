@@ -66,6 +66,15 @@ let gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
 let program;
 let SHADERS = {};
 
+if (!gl) {
+	let c = canvas.getContext("2d");
+	c.fillStyle = "red";
+	c.font = "bold 60px sans-serif";
+	c.fillText("Your browser must have ", 10, 0.25 * canvas.height, canvas.width - 20);
+	c.fillText("Support for WebGL2", 10, 0.55 * canvas.height, canvas.width - 20);
+	c.fillText("So no joy for you", 10, 0.85 * canvas.height, canvas.width - 20);
+}
+
 let ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
 // This isn't quite the way shadertoy decides mouse positions, regarding
