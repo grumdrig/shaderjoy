@@ -158,10 +158,10 @@ function compilePixelShader(link) {
 	gl.shaderSource(vertexShader, `#version 300 es
 		precision highp float;
 
-		in vec2 aPosition;
-
 		void main() {
-			gl_Position = vec4(aPosition, 0, 1);
+			gl_Position = vec4(1, -1, 0, 1);
+			if (gl_VertexID < 4 && gl_VertexID != 1) gl_Position.x = -1.0;
+			if (gl_VertexID > 1 && gl_VertexID != 4) gl_Position.y = 1.0;
 		}
 	`);
 	gl.compileShader(vertexShader);
@@ -191,12 +191,6 @@ function compilePixelShader(link) {
 	gl.linkProgram(program);
 	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
 	gl.useProgram(program);
-
-	gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, +1,-1, -1,+1,
-		                                             -1,+1, +1,-1, +1,+1]), gl.STATIC_DRAW, 0);
-	gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
-	gl.enableVertexAttribArray(0);
 
 	window.requestAnimationFrame(tick);
 }
@@ -272,12 +266,6 @@ void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
 	gl.linkProgram(program);
 	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
 	gl.useProgram(program);
-
-	// gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-	// gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, +1,-1, -1,+1,
-	// 	                                             -1,+1, +1,-1, +1,+1]), gl.STATIC_DRAW, 0);
-	// gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
-	// gl.enableVertexAttribArray(0);
 
 	program.iNumPoints = iNumPoints;
 
