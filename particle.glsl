@@ -1,5 +1,4 @@
-#pragma numPoints 10
-#define iNumPoints 10
+#define iNumPoints 50
 
 void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
 	float a = 2.0 * 3.141 * float(pointIndex) / float(iNumPoints) + iTime;

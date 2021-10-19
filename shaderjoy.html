@@ -126,13 +126,13 @@ function contrastingColor(r, g, b) {
 }
 
 const UNIFORMS = `
-		uniform vec3      iResolution;           // viewport resolution (in pixels)
-		uniform float     iTime;                 // shader playback time (in seconds)
-		uniform float     iGlobalTime;           // obsolescent progenitor of iTime
-		uniform float     iTimeDelta;            // render time (in seconds)
-		uniform mediump int       iFrame;                // shader playback frame
-		uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
-		uniform vec4      iDate;                 // (year, month, day, time in seconds)
+		uniform vec3      iResolution;      // viewport resolution (in pixels)
+		uniform float     iTime;            // shader playback time (in seconds)
+		uniform float     iGlobalTime;      // obsolescent progenitor of iTime
+		uniform float     iTimeDelta;       // render time (in seconds)
+		uniform mediump int       iFrame;   // shader playback frame
+		uniform vec4      iMouse;           // mouse coords. xy: current (if MLB down), zw: click
+		uniform vec4      iDate;            // (year, month, day, time in seconds)
 `;
 
 function compileShader(link) {
@@ -198,7 +198,7 @@ function compilePixelShader(link) {
 
 function compileParticleShader(link) {
 	let iNumPoints = 100;
-	let m = link.currentContents.match(/^#pragma\s+numPoints\s+([0-9]+)/m);
+	let m = link.currentContents.match(/^#\s*define\s+iNumPoints\s+([0-9]+)/m);
 	if (m && m[1]) {
 		iNumPoints = parseInt(m[1]);
 	}
@@ -208,8 +208,6 @@ function compileParticleShader(link) {
 		precision highp float;
 
 		${UNIFORMS}
-
-		uniform mediump int iNumPoints;
 
 		flat out int pointIndex;
 
@@ -230,8 +228,6 @@ function compileParticleShader(link) {
 		precision highp float;
 
 		${UNIFORMS}
-
-		uniform mediump int iNumPoints;
 
 		flat in int pointIndex;
 		out vec4 FragColor;
