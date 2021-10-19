@@ -125,7 +125,30 @@ function contrastingColor(r, g, b) {
 	}
 }
 
-function go(link) {
+const UNIFORMS = `
+		uniform vec3      iResolution;           // viewport resolution (in pixels)
+		uniform float     iTime;                 // shader playback time (in seconds)
+		uniform float     iGlobalTime;           // obsolescent progenitor of iTime
+		uniform float     iTimeDelta;            // render time (in seconds)
+		uniform mediump int       iFrame;                // shader playback frame
+		uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
+		uniform vec4      iDate;                 // (year, month, day, time in seconds)
+`;
+
+function compileShader(link) {
+	if (link.currentContents.search(/\bmainParticle\b/g) >= 0) {
+		// this is a particle renderer
+		compileParticleShader(link);
+		program.isParticleShader = true;
+	} else {
+		compilePixelShader(link);
+		program.isPixelShader = true;
+	}
+}
+
+
+
+function compilePixelShader(link) {
 	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
 	gl.shaderSource(vertexShader, `#version 300 es
 		precision highp float;
@@ -143,13 +166,7 @@ function go(link) {
 	gl.shaderSource(fragmentShader, `#version 300 es
 		precision highp float;
 
-		uniform vec3      iResolution;           // viewport resolution (in pixels)
-		uniform float     iTime;                 // shader playback time (in seconds)
-		uniform float     iGlobalTime;           // obsolescent progenitor of iTime
-		uniform float     iTimeDelta;            // render time (in seconds)
-		uniform int       iFrame;                // shader playback frame
-		uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
-		uniform vec4      iDate;                 // (year, month, day, time in seconds)
+		${UNIFORMS}
 
 		#line 1
 		${link.currentContents}
@@ -175,6 +192,93 @@ function go(link) {
 		                                             -1,+1, +1,-1, +1,+1]), gl.STATIC_DRAW, 0);
 	gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
 	gl.enableVertexAttribArray(0);
+
+	window.requestAnimationFrame(tick);
+}
+
+function compileParticleShader(link) {
+	let iNumPoints = 100;
+	let m = link.currentContents.match(/^#pragma\s+numPoints\s+([0-9]+)/m);
+	if (m && m[1]) {
+		iNumPoints = parseInt(m[1]);
+	}
+
+	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
+	gl.shaderSource(vertexShader, `#version 300 es
+		precision highp float;
+
+		${UNIFORMS}
+
+		uniform mediump int iNumPoints;
+
+		flat out int pointIndex;
+
+		#line 1
+		${link.currentContents}
+
+		void main() {
+			mainParticle(gl_Position.xy, gl_PointSize, gl_VertexID);
+			gl_Position.zw = vec2(0, 1);
+			pointIndex = gl_VertexID;
+		}
+	`);
+	gl.compileShader(vertexShader);
+	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vertexShader));
+
+	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+	gl.shaderSource(fragmentShader, `#version 300 es
+		precision highp float;
+
+		${UNIFORMS}
+
+		uniform mediump int iNumPoints;
+
+		flat in int pointIndex;
+		out vec4 FragColor;
+
+		#line 1
+		${link.currentContents}
+
+		void main() {
+			mainImage(FragColor, gl_PointCoord, pointIndex);
+		}
+	`);
+	let example = `
+#pragma numPoints 10
+
+void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
+	float a = 2.0 * 3.141 * float(pointIndex) / float(iNumPoints) + iTime;
+	pointPosition = vec2(cos(a), sin(a));
+	pointPosition.x *= iResolution.y / iResolution.x;
+	pointPosition *= 0.8;
+	pointSize = 25.0;// * float(pointIndex) / float(iNumPoints);
+}
+
+void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
+	pointCoord = pointCoord * 2.0 - 1.0;
+	pointCoord *= 1.1; // point coordinates don't cover the whole range (in firefox at least)
+	float d = length(pointCoord);
+	fragColor = vec4(float(pointIndex)/float(iNumPoints), 0, 0, d < 1.0 ? 1.0 : 0.0);
+}
+`;
+
+	gl.compileShader(fragmentShader);
+	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), link.filename);
+
+	program = gl.createProgram()
+	gl.attachShader(program, vertexShader);
+	gl.attachShader(program, fragmentShader);
+	gl.linkProgram(program);
+	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+	gl.useProgram(program);
+
+	// gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+	// gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, +1,-1, -1,+1,
+	// 	                                             -1,+1, +1,-1, +1,+1]), gl.STATIC_DRAW, 0);
+	// gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, 0, 0);
+	// gl.enableVertexAttribArray(0);
+
+	program.iNumPoints = iNumPoints;
 
 	window.requestAnimationFrame(tick);
 }
@@ -232,7 +336,7 @@ function reload(firstTime) {
 								SHADERS[i].classList.remove("selected");
 							}
 						}
-						go(link);
+						compileShader(link);
 						$("#title").innerText = link.filename;
 					} catch (e) {
 						let numbered = link.currentContents.split('\n').map((c,i)=>i+1 + ": " + c).join('\n');
@@ -320,7 +424,13 @@ function tick() {
 			gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
 		}
 
-		gl.drawArrays(gl.TRIANGLES, 0, 6);
+		if(program.isParticleShader) {
+			gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
+			gl.uniform1i(gl.getUniformLocation(program, "iNumPoints"), program.iNumPoints);
+			gl.drawArrays(gl.POINTS, 0, program.iNumPoints);
+		} else {
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+		}
 
 		if (query) {
 			ext.query = query;
