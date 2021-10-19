@@ -62,7 +62,12 @@ let canvas = $("canvas");
 canvas.width = 500;
 canvas.height = 281;
 canvas.iMouse = [0,0,0,0];
-let gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
+let gl = canvas.getContext("webgl2", {
+	preserveDrawingBuffer: true,
+	// https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html
+	// premultipliedAlpha: false,
+	// alpha: false,
+});
 let program;
 let SHADERS = {};
 
@@ -275,6 +280,9 @@ void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
 	// gl.enableVertexAttribArray(0);
 
 	program.iNumPoints = iNumPoints;
+
+	gl.enable(gl.BLEND);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 	window.requestAnimationFrame(tick);
 }
