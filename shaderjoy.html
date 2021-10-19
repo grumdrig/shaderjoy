@@ -224,8 +224,13 @@ function compileShader(link) {
 	if (program.isParticleShader) {
 		program.iNumPoints = 100;
 		let m = link.currentContents.match(/^#\s*define\s+iNumPoints\s+([0-9]+)/m);
-		if (m && m[1]) {
+		if (m) {
 			program.iNumPoints = parseInt(m[1]);
+		}
+
+		m = link.currentContents.match(/^#\s*define\s+ClearColor\s+\(\s*([^,)])\s*,\s*([^,)])\s*,\s*([^,)])\s*,\s*([^,)])\s*\)/m);
+		if (m) {
+			gl.clearColor(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]));
 		}
 
 		gl.enable(gl.BLEND);

@@ -74,6 +74,7 @@ float noise(vec3 P){
   float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
   return 2.2 * n_xyz;
 }
+/*
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 	vec2 uv = vec2(-1.0,-1.0) + 2.0 * fragCoord.xy / iResolution.xy;
 	uv.x *= iResolution.x / iResolution.y;
@@ -96,4 +97,51 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 		fragColor = vec4(c, c, c,1.0);
 		// fragColor.r = noise(uv * 10.0);
 	}
+}
+*/
+
+// https://www.youtube.com/watch?v=aeEn609nkRs
+
+#define iNumPoints 10511
+#define ClearColor (1,1,1,1)
+
+void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
+	const float WINDINGS = 10.0;
+	const float R = 5.0;
+	const float SWATH = 0.4 * R;
+	float t = float(pointIndex)/float(iNumPoints);// + iTime * 0.001;
+	// doesn't really matter much what arc spacing to use but using the golden ratio
+	// times pi to minimize overlap
+	float a = 1.61803398875 * 3.14159265 * float(pointIndex);
+	float w = t * SWATH;
+
+	vec2 uv = vec2(cos(a), sin(a));
+
+	float h = abs(noise(vec3(uv * (R + w), iTime * 0.2)));
+	// h = pow(h, 1.5);
+	// float c = clamp(pow(1.0 / h, 0.9), 0.0, 1.0);
+	// if (c < c = d < h * 3.0 ? 1.0 : 0.0;
+	// c *= noise(100.0 * normalize(uv) * iTime * 0.01);
+	/*
+	float h2 = 0.05 * (0.7 + noise(vec3(normalize(uv) * 10.0, 2938.982 + iTime * 0.8)));
+	float c2 = clamp(pow((d-1.0) / h2, 4.0), 0.0, 1.0);
+	// c *= pow((d-1.0) / h2, 4.0);
+	c = c * c2;
+	fragColor = vec4(c, c, c,1.0);
+	// fragColor.r = noise(uv * 10.0);
+	*/
+
+	pointPosition = (1.0 + 0.1 * h) * uv;
+	pointPosition.x *= iResolution.y / iResolution.x;
+	pointPosition *= 0.8;
+	pointSize = 1.0;
+}
+
+void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
+	// pointCoord = pointCoord * 2.0 - 1.0;
+	// pointCoord *= 1.1; // point coordinates don't cover the whole range (in firefox at least)
+	// float d = length(pointCoord);
+	//d = 0.0;
+	// float t = float(pointIndex)/float(iNumPoints);
+	fragColor = vec4(0,0,0,1);// d < 1.0 ? 0.8 : 0.0);
 }
