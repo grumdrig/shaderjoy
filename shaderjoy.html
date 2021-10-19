@@ -141,136 +141,98 @@ const UNIFORMS = `
 `;
 
 function compileShader(link) {
-	if (link.currentContents.search(/\bmainParticle\b/g) >= 0) {
-		// this is a particle renderer
-		compileParticleShader(link);
-		program.isParticleShader = true;
+	program = gl.createProgram();
+	program.isParticleShader = link.currentContents.search(/\bmainParticle\b/g) >= 0;
+	program.isPixelShader = !program.isParticleShader;
+
+	// Vertex shader
+	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
+	if (program.isPixelShader) {
+		gl.shaderSource(vertexShader, `#version 300 es
+			precision highp float;
+
+			void main() {
+				gl_Position = vec4(1, -1, 0, 1);
+				if (gl_VertexID < 4 && gl_VertexID != 1) gl_Position.x = -1.0;
+				if (gl_VertexID > 1 && gl_VertexID != 4) gl_Position.y = 1.0;
+			}
+		`);
 	} else {
-		compilePixelShader(link);
-		program.isPixelShader = true;
+		gl.shaderSource(vertexShader, `#version 300 es
+			precision highp float;
+
+			${UNIFORMS}
+
+			flat out int pointIndex;
+
+			#line 1
+			${link.currentContents}
+
+			void main() {
+				mainParticle(gl_Position.xy, gl_PointSize, gl_VertexID);
+				gl_Position.zw = vec2(0, 1);
+				pointIndex = gl_VertexID;
+			}
+		`);
 	}
-}
-
-
-
-function compilePixelShader(link) {
-	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	gl.shaderSource(vertexShader, `#version 300 es
-		precision highp float;
-
-		void main() {
-			gl_Position = vec4(1, -1, 0, 1);
-			if (gl_VertexID < 4 && gl_VertexID != 1) gl_Position.x = -1.0;
-			if (gl_VertexID > 1 && gl_VertexID != 4) gl_Position.y = 1.0;
-		}
-	`);
 	gl.compileShader(vertexShader);
 	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vertexShader));
 
+	// Fragment shader
 	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, `#version 300 es
-		precision highp float;
+	if (program.isPixelShader) {
+		gl.shaderSource(fragmentShader, `#version 300 es
+			precision highp float;
 
-		${UNIFORMS}
+			${UNIFORMS}
 
-		#line 1
-		${link.currentContents}
+			out vec4 FragColor;
 
-		out vec4 FragColor;
+			#line 1
+			${link.currentContents}
 
-		void main() {
-			mainImage(FragColor, gl_FragCoord.xy);
-		}
-	`);
+			void main() {
+				mainImage(FragColor, gl_FragCoord.xy);
+			}
+		`);
+	} else {
+		gl.shaderSource(fragmentShader, `#version 300 es
+			precision highp float;
+
+			${UNIFORMS}
+
+			flat in int pointIndex;
+			out vec4 FragColor;
+
+			#line 1
+			${link.currentContents}
+
+			void main() {
+				mainImage(FragColor, gl_PointCoord, pointIndex);
+			}
+		`);
+	}
 	gl.compileShader(fragmentShader);
 	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), link.filename);
 
-	program = gl.createProgram()
 	gl.attachShader(program, vertexShader);
 	gl.attachShader(program, fragmentShader);
 	gl.linkProgram(program);
 	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
 	gl.useProgram(program);
 
-	window.requestAnimationFrame(tick);
-}
+	if (program.isParticleShader) {
+		program.iNumPoints = 100;
+		let m = link.currentContents.match(/^#\s*define\s+iNumPoints\s+([0-9]+)/m);
+		if (m && m[1]) {
+			program.iNumPoints = parseInt(m[1]);
+		}
 
-function compileParticleShader(link) {
-	let iNumPoints = 100;
-	let m = link.currentContents.match(/^#\s*define\s+iNumPoints\s+([0-9]+)/m);
-	if (m && m[1]) {
-		iNumPoints = parseInt(m[1]);
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+	} else {
+		gl.disable(gl.BLEND);
 	}
-
-	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	gl.shaderSource(vertexShader, `#version 300 es
-		precision highp float;
-
-		${UNIFORMS}
-
-		flat out int pointIndex;
-
-		#line 1
-		${link.currentContents}
-
-		void main() {
-			mainParticle(gl_Position.xy, gl_PointSize, gl_VertexID);
-			gl_Position.zw = vec2(0, 1);
-			pointIndex = gl_VertexID;
-		}
-	`);
-	gl.compileShader(vertexShader);
-	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vertexShader));
-
-	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	gl.shaderSource(fragmentShader, `#version 300 es
-		precision highp float;
-
-		${UNIFORMS}
-
-		flat in int pointIndex;
-		out vec4 FragColor;
-
-		#line 1
-		${link.currentContents}
-
-		void main() {
-			mainImage(FragColor, gl_PointCoord, pointIndex);
-		}
-	`);
-	let example = `
-#pragma numPoints 10
-
-void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
-	float a = 2.0 * 3.141 * float(pointIndex) / float(iNumPoints) + iTime;
-	pointPosition = vec2(cos(a), sin(a));
-	pointPosition.x *= iResolution.y / iResolution.x;
-	pointPosition *= 0.8;
-	pointSize = 25.0;// * float(pointIndex) / float(iNumPoints);
-}
-
-void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
-	pointCoord = pointCoord * 2.0 - 1.0;
-	pointCoord *= 1.1; // point coordinates don't cover the whole range (in firefox at least)
-	float d = length(pointCoord);
-	fragColor = vec4(float(pointIndex)/float(iNumPoints), 0, 0, d < 1.0 ? 1.0 : 0.0);
-}
-`;
-
-	gl.compileShader(fragmentShader);
-	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), link.filename);
-
-	program = gl.createProgram()
-	gl.attachShader(program, vertexShader);
-	gl.attachShader(program, fragmentShader);
-	gl.linkProgram(program);
-	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-	gl.useProgram(program);
-
-	program.iNumPoints = iNumPoints;
-
-	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 	window.requestAnimationFrame(tick);
 }
