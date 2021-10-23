@@ -102,7 +102,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
 // https://www.youtube.com/watch?v=aeEn609nkRs
 
-#define iNumPoints 10511
+#define iNumPoints 11939
 #define ClearColor (1,1,1,1)
 
 void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
@@ -117,8 +117,8 @@ void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex
 
 	vec2 uv = vec2(cos(a), sin(a));
 
-	float h = abs(noise(vec3(uv * (R + w), iTime * 0.2)));
-	// h = pow(h, 1.5);
+	float h = 1.2 * abs(noise(vec3(uv * (R + w), iTime * 0.2)));
+	h = pow(h, 1.2);
 	// float c = clamp(pow(1.0 / h, 0.9), 0.0, 1.0);
 	// if (c < c = d < h * 3.0 ? 1.0 : 0.0;
 	// c *= noise(100.0 * normalize(uv) * iTime * 0.01);
@@ -134,7 +134,7 @@ void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex
 	pointPosition = (1.0 + 0.1 * h) * uv;
 	pointPosition.x *= iResolution.y / iResolution.x;
 	pointPosition *= 0.8;
-	pointSize = 1.0;
+	pointSize = 0.5;
 }
 
 void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
