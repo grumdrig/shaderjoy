@@ -74,38 +74,58 @@ float noise(vec3 P){
   float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
   return 2.2 * n_xyz;
 }
-/*
+
+float fbm(vec3 P) {
+	return (noise(P)
+		+ 0.50 * noise(P/2.0 + vec3(23.12, 92.93, 29.91))
+		+ 0.25 * noise(P/4.0 + vec3(45.21, 29.02, 23.11))
+		)
+	// * 1.75
+		;
+}
+
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 	vec2 uv = vec2(-1.0,-1.0) + 2.0 * fragCoord.xy / iResolution.xy;
 	uv.x *= iResolution.x / iResolution.y;
 	uv *= 1.4;
 	float d = dot(uv, uv);
 	float a = atan(uv.y, uv.x);
-	if (d < 1.0) {
-		float c = 1.0 - pow(d, 40.0);
-		fragColor = vec4(c,c,c,1.0);
+	if (d < 0.99 || d > 1.6) {
+		// optimization
+		fragColor = vec4(1,1,1,1);
 	} else {
-		float h = 1.1 * (0.5 + noise(vec3(normalize(uv) * 10.0, iTime * 0.1)));
-		h = pow(h, 2.0);
-		float c = clamp(pow(d / h, 0.9), 0.0, 1.0);
-		// if (c < c = d < h * 3.0 ? 1.0 : 0.0;
-		// c *= noise(100.0 * normalize(uv) * iTime * 0.01);
-		float h2 = 0.05 * (0.7 + noise(vec3(normalize(uv) * 10.0, 2938.982 + iTime * 0.8)));
-		float c2 = clamp(pow((d-1.0) / h2, 4.0), 0.0, 1.0);
-		// c *= pow((d-1.0) / h2, 4.0);
-		c = c * c2;
-		fragColor = vec4(c, c, c,1.0);
-		// fragColor.r = noise(uv * 10.0);
+		const float R = 5.0;
+		const float ZERO = 0.0;
+		float old_h;
+		d -= 1.0;
+		d += ZERO;
+		const int SWATH = 32;
+		int collisions = 0;
+		for (int i = 0; i < SWATH; ++i) {
+			float h = ZERO + 0.6 * (fbm(vec3(uv * (R + float(i) * 0.125), iTime * 0.2)));
+			h = abs(h);
+			h = pow(h, 1.7);
+			if (i > 0) {
+				if ((old_h < d && d < h) ||	(h < d && d < old_h))
+					collisions += 1;
+			}
+			old_h = h;
+		}
+		float c = 1.0 - 3.0 * float(collisions) / float(SWATH);
+		fragColor = vec4(c, c, c, 1.0);
 	}
 }
-*/
+
+
 
 // https://www.youtube.com/watch?v=aeEn609nkRs
 
+/*
 #define iNumPoints 11939
 #define ClearColor (1,1,1,1)
 
-void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
+void main Particle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
 	const float WINDINGS = 10.0;
 	const float R = 5.0;
 	const float SWATH = 0.4 * R;
@@ -129,7 +149,7 @@ void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex
 	c = c * c2;
 	fragColor = vec4(c, c, c,1.0);
 	// fragColor.r = noise(uv * 10.0);
-	*/
+	* /
 
 	pointPosition = (1.0 + 0.1 * h) * uv;
 	pointPosition.x *= iResolution.y / iResolution.x;
@@ -137,7 +157,7 @@ void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex
 	pointSize = 0.5;
 }
 
-void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
+void main Image(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
 	// pointCoord = pointCoord * 2.0 - 1.0;
 	// pointCoord *= 1.1; // point coordinates don't cover the whole range (in firefox at least)
 	// float d = length(pointCoord);
@@ -145,3 +165,4 @@ void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
 	// float t = float(pointIndex)/float(iNumPoints);
 	fragColor = vec4(0,0,0,1);// d < 1.0 ? 0.8 : 0.0);
 }
+*/

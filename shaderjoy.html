@@ -340,7 +340,10 @@ $("#pause").onclick = function (e) {
 
 let timer = 0;
 
-function tick() {
+let TIMESTAMP = 1/0;
+function tick(timestamp) {
+	if (timestamp == TIMESTAMP) return;
+	TIMESTAMP = timestamp;
 	if (PAUSED == false) {
 		let clock = performance.now();
 		gl.viewport(0, 0, canvas.width, canvas.height);
