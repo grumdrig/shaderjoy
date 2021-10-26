@@ -59,8 +59,8 @@ function mouseaction() { return $("#mouseaction").value }
 const abs = Math.abs, min = Math.min;
 
 let canvas = $("canvas");
-canvas.width = 500;
-canvas.height = 281;
+canvas.width = 840;
+canvas.height = 472;
 canvas.iMouse = [0,0,0,0];
 let gl = canvas.getContext("webgl2", {
 	preserveDrawingBuffer: true,
@@ -342,8 +342,10 @@ let timer = 0;
 
 let TIMESTAMP = 1/0;
 function tick(timestamp) {
+	// Shitty code seems to mount up calls to requestAnimationFrame
 	if (timestamp == TIMESTAMP) return;
 	TIMESTAMP = timestamp;
+
 	if (PAUSED == false) {
 		let clock = performance.now();
 		gl.viewport(0, 0, canvas.width, canvas.height);
