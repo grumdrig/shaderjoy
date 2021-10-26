@@ -78,11 +78,13 @@ float noise(vec3 P){
 float fbm(vec3 P) {
 	return (noise(P)
 		+ 0.50 * noise(P/2.0 + vec3(23.12, 92.93, 29.91))
-		+ 0.25 * noise(P/4.0 + vec3(45.21, 29.02, 23.11))
+		// + 0.25 * noise(P/4.0 + vec3(45.21, 29.02, 23.11))
 		)
 	// * 1.75
 		;
 }
+
+
 
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
@@ -95,13 +97,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 		// optimization
 		fragColor = vec4(1,1,1,1);
 	} else {
-		const float R = 5.0;
+		const float R = 3.0;
 		const float ZERO = 0.0;
 		float old_h;
 		d -= 1.0;
 		d += ZERO;
 		const float SWATH = 3.0;
-    const float STEP = 0.1;
+    const float STEP = 0.4;
 		float c = 0.0;
 		for (float i = 0.0; i < SWATH; i += STEP) {
 			float h = ZERO + 0.6 * (fbm(vec3(uv * (R + i), iTime * 0.2)));
@@ -109,7 +111,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 			h = pow(h, 1.9);
 			if (i > 0.0) {
 				if ((old_h < d && d < h) ||	(h < d && d < old_h))
-          c += 0.15;
+          c += STEP * 0.04 / abs(old_h - h);
 			}
 			old_h = h;
 		}
