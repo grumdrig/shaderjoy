@@ -421,7 +421,59 @@ function drawGraph() {
 	}
 }
 
+/*
+function textureFromPixelArray(gl, dataArray, type, width, height) {
+    var dataTypedArray = new Uint8Array(dataArray); // Don't need to do this if the data is already in a typed array
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, type, width, height, 0, type, gl.UNSIGNED_BYTE, dataTypedArray);
+    // Other texture setup here, like filter modes and mipmap generation
+    return texture;
+}
+*/
+</script>
+
+<script id="audioworklet" type="worklet" type=>
+// This "type=" mumbo jumbo causes Sublime Text to syntax highlight as JS but the script not
+// to execute, in Chrome at least
+
+// https://github.com/WebAudio/web-audio-api-v2/issues/109
+registerProcessor('GpuAudio', class GpuAudio extends AudioWorkletProcessor {
+	constructor() {
+		super();
+		console.log("ctor");
+	}
+	process(inputs, outputs, parameters) {
+		outputs[0].forEach(channel => {
+			for (let i = 0; i < channel.length; ++i) {
+				channel[i] = Math.random() * 2 - 1;
+			}
+		});
+		console.log(outputs[0][0].length);
+		return true;
+	}
+});
+</script>
+
+<span id="audiobutton">Audio</span>
+
+<script>
+let AUDIO;
+function goAudio() {
+	let AUDIO = new AudioContext();
+	const blob = new Blob([$("#audioworklet").innerText], {type: "application/javascript"});
+	let url = URL.createObjectURL(blob);
+	AUDIO.audioWorklet.addModule(url).then(() => {
+		var node = new AudioWorkletNode(AUDIO, 'GpuAudio');
+		node.connect(AUDIO.destination);
+	});
+}
+
+$("#audiobutton").addEventListener('click', e => goAudio());
+
 reload(true);
 
+
 </script>
+
 </body>
