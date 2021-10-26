@@ -84,7 +84,21 @@ float fbm(vec3 P) {
 		;
 }
 
+// The original is pretty clearly rendered as particles arranged in an annular ring,
+// each with height (distance from center) determined by a noise function of some kind,
+// viewed edge-on.
 
+// See: https://www.youtube.com/watch?v=aeEn609nkRs
+
+// Here instead I step through a height field and determine the color of the pixel
+// according to how many times a ray intersects it at each particular height. I approximate
+// the particle density and therefore the darkness of that pixel by dividing by the
+// derivative of the curve at that point, which in turn is approximated by the difference
+// in the height field at each point of intersection.
+
+// I use a 3D noise function, one dimension of which is used for time, leaving two
+// spatial dimensions, so rather than calculating a noise value in a 3d space, I use
+// flat ring in 2d space (i.e. a thick circle).
 
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
@@ -93,10 +107,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 	uv *= 1.4;
 	float d = dot(uv, uv);
 	float a = atan(uv.y, uv.x);
-	if (d < 0.99 || d > 1.6) {
-		// optimization
-		fragColor = vec4(1,1,1,1);
-	} else {
+  float c = 0.0;
+	if (d >= 1.0 && d < 1.6) {
 		const float R = 3.0;
 		const float ZERO = 0.0;
 		float old_h;
@@ -104,20 +116,20 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 		d += ZERO;
 		const float SWATH = 3.0;
     const float STEP = 0.4;
-		float c = 0.0;
 		for (float i = 0.0; i < SWATH; i += STEP) {
 			float h = ZERO + 0.6 * (fbm(vec3(uv * (R + i), iTime * 0.2)));
 			h = abs(h);
 			h = pow(h, 1.9);
+      h += i / 40.0;  // conify the ring slightly
 			if (i > 0.0) {
 				if ((old_h < d && d < h) ||	(h < d && d < old_h))
-          c += STEP * 0.04 / abs(old_h - h);
+          c += STEP * 0.03 / abs(old_h - h);
 			}
 			old_h = h;
 		}
-		c = 1.0 - c;
-		fragColor = vec4(c, c, c, 1.0);
 	}
+  c = 1.0 - c;  // it's black on white
+  fragColor = vec4(c, c, c, 1.0);
 }
 
-// https://www.youtube.com/watch?v=aeEn609nkRs
+
