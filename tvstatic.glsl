@@ -97,5 +97,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 	edge = 2.0;
 	if (yedge < edge) c *= yedge / edge;
 
+	c = 0.25 + c * 0.5;
+
     fragColor = mix(fragColor, vec4(c, c, c, 1.0), 0.8);
 }

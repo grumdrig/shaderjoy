@@ -159,7 +159,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
 	vec2 uv = (fragCoord - iResolution.xy*0.5)/iResolution.y;
 
 	// Camera Setup.
-	vec3 camPos = vec3(0.0, 0.0, iTime*5.); // Camera position, doubling as the ray origin.
+    bool run = true;
+    // Camera position, doubling as the ray origin.
+    float speed = 1.0 + iMouse[0] / iResolution.x;
+	vec3 camPos = vec3(0.0, speed * 0.02*sin(iTime*8.0*speed), iTime*0.5*speed*speed);
 	vec3 lookAt = camPos + vec3(0.0, 0.1, 0.5);  // "Look At" position.
 
     // Light positioning. One is a little behind the camera, and the other is further down the tunnel.
@@ -189,7 +192,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
     // Standard ray marching routine. I find that some system setups don't like anything other than
     // a "break" statement (by itself) to exit.
 	float t = 0.0, dt;
-	for(int i=0; i<128; i++){
+	for(int i = 0; i < 128; i++){
 		dt = map(camPos + rd*t);
 		if(dt<0.005 || t>150.){ break; }
 		t += dt*0.75;
@@ -210,9 +213,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
         const float tSize1 = 1./4.;
 
     	// Texture-based bump mapping.
-    	sn = vec3(0.5,0.5,1);
-	    // if (sp.y<-(FH-0.005)) sn = doBumpMap(iChannel1, sp*tSize1, sn, 0.025); // Floor.
-	    // else sn = doBumpMap(iChannel0, sp*tSize0, sn, 0.025); // Walls.
+    	sn = vec3(1,1,1);
+	    if (sp.y<-(FH-0.005)) sn = vec3(0,1,0); // Floor.
+	    else sn = vec3(0.577,-0.577,-0.577); // Walls.
 
 	    // Ambient occlusion.
 	    float ao = calculateAO(sp, sn);
@@ -252,10 +255,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
         float fre = pow( clamp(dot(sn, rd) + 1., .0, 1.), 1.);
 
         // Obtaining the texel color. If the surface point is above the floor
-        // height use the wall texture, otherwise use the floor texture.
+        // height use the wall color, otherwise use the floor color.
         vec3 texCol = vec3(1,0.5,0.5);
-      //   if (sp.y<-(FH - 0.005)) texCol = tex3D(iChannel1, sp*tSize1, sn); // Floor.
- 	    // else texCol = tex3D(iChannel0, sp*tSize0, sn); // Walls.
+        if (sp.y<-(FH - 0.005)) texCol = vec3(1,1,0.5); // Floor.
+ 	    else texCol = vec3(1,0.5,1.0); // Walls.
 
         // Shadertoy doesn't appear to have anisotropic filtering turned on... although,
         // I could be wrong. Texture-bumped objects don't appear to look as crisp. Anyway,
