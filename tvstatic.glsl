@@ -1,6 +1,10 @@
 // Borrowing a lot from
 // https://www.shadertoy.com/view/ldXGW4
 
+/*
+#include "abstractcorridor.glsl"
+*/
+
 vec3 mod289(vec3 x) {
   return x - floor(x * (1.0 / 289.0)) * 289.0;
 }
@@ -67,27 +71,31 @@ const vec2 TVRES = vec2(320, 240);
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 	vec2 coord = floor(TVRES * fragCoord / iResolution.xy);
-	float vscan = mod(iTime * 200.0, iResolution.y * 2.0) - iResolution.y/2.0;
-	if (abs(vscan - coord.y) < 5.0) {
-		fragColor = vec4(0,0,0,1);
-	} else {
-		float time = floor(iTime * 15.0) / 15.0;
-		float c = fract(928.32 * sin(coord.x * 231.232 + coord.y * 928.291 + 832.21 * time));
-		float edge = 2.0 * snoise(vec2(iTime/10.0, coord.y/20.0));
-		edge += 1.5 + 3.0 * snoise(vec2(iTime/100.0, coord.y/200.0));
-		float xedge = coord.x;
-		if (xedge > TVRES.x / 2.0) {
-			xedge = TVRES.x - xedge;
-			edge = -edge;
-			edge += 2.0;
-		}
-		edge += 6.0;
-		if (xedge < edge) c *= xedge / edge;
 
-		float yedge = min(coord.y, TVRES.y - coord.y);
-		edge = 2.0;
-		if (yedge < edge) c *= yedge / edge;
-
-	    fragColor = vec4(c, c, c, 1.0);
+	float vscan = mod(iTime * 400.0, TVRES.y * 12.0);
+	if (vscan < TVRES.y) {
+		coord.y = mod(coord.y + TVRES.y - vscan, TVRES.y);
 	}
+
+	abstractcorridor_mainImage(fragColor, coord * iResolution.xy / TVRES);
+
+
+	float time = floor(iTime * 15.0) / 15.0;
+	float c = fract(928.32 * sin(coord.x * 231.232 + coord.y * 928.291 + 832.21 * time));
+	float edge = 2.0 * snoise(vec2(iTime/10.0, coord.y/20.0));
+	edge += 1.5 + 3.0 * snoise(vec2(iTime/100.0, coord.y/200.0));
+	float xedge = coord.x;
+	if (xedge > TVRES.x / 2.0) {
+		xedge = TVRES.x - xedge;
+		edge = -edge;
+		edge += 2.0;
+	}
+	edge += 6.0;
+	if (xedge < edge) c *= xedge / edge;
+
+	float yedge = min(coord.y, TVRES.y - 1.0 - coord.y);
+	edge = 2.0;
+	if (yedge < edge) c *= yedge / edge;
+
+    fragColor = mix(fragColor, vec4(c, c, c, 1.0), 0.8);
 }
