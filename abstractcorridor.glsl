@@ -159,9 +159,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
 	vec2 uv = (fragCoord - iResolution.xy*0.5)/iResolution.y;
 
 	// Camera Setup.
-    bool run = true;
+
     // Camera position, doubling as the ray origin.
-    float speed = 1.0 + iMouse[0] / iResolution.x;
+    float speed = 0.0 + 2.0 * iMouse[0] / iResolution.x;
 	vec3 camPos = vec3(0.0, speed * 0.02*sin(iTime*8.0*speed), iTime*0.5*speed*speed);
 	vec3 lookAt = camPos + vec3(0.0, 0.1, 0.5);  // "Look At" position.
 

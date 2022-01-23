@@ -99,5 +99,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 	c = 0.25 + c * 0.5;
 
-    fragColor = mix(fragColor, vec4(c, c, c, 1.0), 0.8);
+    fragColor = mix(fragColor, vec4(c,c,c, 1.0), 0.8);
+  	if (int(fragCoord.x) % 3 != 0) fragColor.r = 0.0;
+  	if (int(fragCoord.x) % 3 != 1) fragColor.g = 0.0;
+  	if (int(fragCoord.x) % 3 != 2) fragColor.b = 0.0;
+
 }
