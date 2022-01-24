@@ -91,6 +91,18 @@ mat2 rot2(float a){
 }
 
 
+// float smoothstep(float x) {
+//   return 3.0 * x*x - 2.0 * x*x*x;
+// }
+
+vec2 invss(vec2 x) {
+  return 0.5 - sin(asin(1.0-2.0*x)/3.0);
+}
+
+vec2 sstep(vec2 x) {
+  return invss(x * 0.5 + 0.5) * 2.0 - 1.0;
+}
+
 // https://www.youtube.com/watch?v=aeEn609nkRs
 #define iNumPoints 10000
 #define ClearColor (0,0,0,1)
@@ -99,13 +111,22 @@ void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex
   float N = sqrt(float(iNumPoints));
   float i = mod(float(pointIndex), N);
   float j = floor(float(pointIndex) / N);
-
   vec2 d = 2.0 * vec2(i/N - 0.5, j/N - 0.5);
-  d.x = pow(d.x, 3.0);
-  d.y = pow(d.y, 3.0);
+  d += 0.1/N;
+  // d = asin(d * 0.8);
 
-  float l = length(d) * 5.0;
-  float h = 0.8 * noise(vec3(d * 10.0, 0.2 * iTime))  * (sin(l) / pow(l, 1.5));
+  /*
+  vec2 d = 2.0 * vec2(sin(fract(232.92 * sin(2.298 * float(pointIndex) + 293.232))),
+                      sin(fract(492.12 * sin(5.232 * float(pointIndex) + 921.122)))) - 1.0;
+                      */
+
+  d *= 0.9;
+  // d.x = pow(d.x, 3.0);
+  // d.y = pow(d.y, 3.0);
+  d = sstep(d);
+
+  float l = length(d) * 3.0;
+  float h = 0.8 * noise(vec3(d * 10.0, 0.02 * iTime))  * (sin(l) / (0.01 + pow(l, 1.5)));
   h = abs(h);
   // h = 0.0;
 
@@ -135,7 +156,7 @@ void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex
 	pointPosition.x *= iResolution.y / iResolution.x;
 	// pointPosition *= 0.8;
 
-	pointSize = 1.5;
+	pointSize = 2.0;
 }
 
 void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
