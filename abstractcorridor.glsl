@@ -187,7 +187,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
     vec3 rd = normalize(forward + FOV*uv.x*right + FOV*uv.y*up);
 
     // Swiveling the camera from left to right when turning corners.
-    rd.xy = rot2( path(lookAt.z).x/32. )*rd.xy;
+    rd.xz = rot2( path(lookAt.z).x/32. )*rd.xz;
+
+    // Stressed-out head swiveling
+    // This works nice but needs to only happen intermittently
+    // And more with higher stress
+    rd.xz = rot2( 2.5 * pow(sin(iTime), 5.0) )*rd.xz;
 
     // Standard ray marching routine. I find that some system setups don't like anything other than
     // a "break" statement (by itself) to exit.

@@ -7,7 +7,7 @@
 // change these values to 0.0 to turn off individual effects
 float vertJerkOpt = 1.0;
 float vertMovementOpt = 1.0;
-float bottomStaticOpt = 20.0;
+float bottomStaticOpt = 10.0;
 float scalinesOpt = 2.0;
 float rgbOffsetOpt = 1.5;
 float horzFuzzOpt = 4.0;

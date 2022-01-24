@@ -82,6 +82,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 	float time = floor(iTime * 15.0) / 15.0;
 	float c = fract(928.32 * sin(coord.x * 231.232 + coord.y * 928.291 + 832.21 * time));
+
 	float edge = 2.0 * snoise(vec2(iTime/10.0, coord.y/20.0));
 	edge += 1.5 + 3.0 * snoise(vec2(iTime/100.0, coord.y/200.0));
 	float xedge = coord.x;
