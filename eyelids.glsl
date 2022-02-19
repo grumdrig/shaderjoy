@@ -1,3 +1,7 @@
+// This is meant to look how the inside of my eyelids looked as I was trying to sleep once.
+// It's not right yet.
+
+
 
 // From this shitty gist https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83
 //	Classic Perlin 3D Noise
@@ -79,91 +83,37 @@ float fbm(vec3 P) {
 	return (noise(P)
 		+ 0.50 * noise(P/2.0 + vec3(23.12, 92.93, 29.91))
 		+ 0.25 * noise(P/4.0 + vec3(45.21, 29.02, 23.11))
+    + 0.125 * noise(P/8.0 + vec3(29.23, 66.25, 33.23))
 		)
 	// * 1.75
 		;
 }
 
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.x;
+  bool invert = uv.x > 0.5;
+  if (invert) uv.x -= 0.5;
+  uv -= vec2(0.25);
+  if (length(uv) < 0.002) {
+    fragColor = vec4(1.0,0.0,0.0,1.0);
+    return;
+  }
+  float d = length(uv * 4.0);
 
-mat2 rot2(float a){
-  float c = cos(a); float s = sin(a);
-  return mat2(c, s, -s, c);
-}
+  uv *= 20.0;
 
-
-// float smoothstep(float x) {
-//   return 3.0 * x*x - 2.0 * x*x*x;
-// }
-
-vec2 invss(vec2 x) {
-  return 0.5 - sin(asin(1.0-2.0*x)/3.0);
-}
-
-vec2 sstep(vec2 x) {
-  return invss(x * 0.5 + 0.5) * 2.0 - 1.0;
-}
-
-// https://www.youtube.com/watch?v=aeEn609nkRs
-#define iNumPoints 10000
-#define ClearColor (0,0,0,1)
-
-void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
-  float N = sqrt(float(iNumPoints));
-  float i = mod(float(pointIndex), N);
-  float j = floor(float(pointIndex) / N);
-  vec2 d = 2.0 * vec2(i/N - 0.5, j/N - 0.5);
-  d += 0.1/N;
-  // d = asin(d * 0.8);
-
-  /*
-  vec2 d = 2.0 * vec2(sin(fract(232.92 * sin(2.298 * float(pointIndex) + 293.232))),
-                      sin(fract(492.12 * sin(5.232 * float(pointIndex) + 921.122)))) - 1.0;
-                      */
-
-  d *= 0.9;
-  // d.x = pow(d.x, 3.0);
-  // d.y = pow(d.y, 3.0);
-  d = sstep(d);
-
-  float l = length(d) * 3.0;
-  float h = 0.8 * fbm(vec3(d * 10.0, 0.02 * iTime))  * (sin(l) / (0.01 + pow(l, 1.5)));
-  h = abs(h);
-  // h = 0.0;
-
-  d = rot2(iTime / 30.0) * d;
-
-  float x = d.x - d.y;
-  float y = -0.5 + 0.3 * (d.x + d.y) + h;
+  float G = 2.0;
+  float age = mod(iTime, G) / G;
+  float generation = floor(iTime / G);
+  if (int(generation) % 2 == 1) invert = !invert;
 
 
-  /*
-	const float WINDINGS = 10.0;
-	const float R = 5.0;
-	const float SWATH = 0.4 * R;
-	float t = float(pointIndex)/float(iNumPoints);// + iTime * 0.001;
-	// doesn't really matter much what arc spacing to use but using the golden ratio
-	// times pi to minimize overlap
-	float a = 1.61803398875 * 3.14159265 * float(pointIndex);
-	float w = t * SWATH;
+  float g = fbm(vec3(uv, generation));
+  g = g * 0.5 + 0.5; // rescale to (0,1)
 
-	vec2 uv = vec2(cos(a), sin(a));
+  g = (g + (1.0 - d)) / 2.0;
 
-	float h = 1.2 * abs(noise(vec3(uv * (R + w), iTime * 0.2)));
-	h = pow(h, 1.2);
-  */
-
-	pointPosition = vec2(x, y);
-	pointPosition.x *= iResolution.y / iResolution.x;
-	// pointPosition *= 0.8;
-
-	pointSize = 2.0;
-}
-
-void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
-	// pointCoord = pointCoord * 2.0 - 1.0;
-	// pointCoord *= 1.1; // point coordinates don't cover the whole range (in firefox at least)
-	// float d = length(pointCoord);
-	//d = 0.0;
-	// float t = float(pointIndex)/float(iNumPoints);
-	fragColor = vec4(0.6,0.8,1.0,1);// d < 1.0 ? 0.8 : 0.0);
+  g = g > age ? 1.0 : 0.0;
+  if (invert) g = 1.0 - g;
+  fragColor = vec4(vec3(g), 1.0);
 }
