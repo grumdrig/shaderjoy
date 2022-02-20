@@ -94,26 +94,32 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   bool invert = uv.x > 0.5;
   if (invert) uv.x -= 0.5;
   uv -= vec2(0.25);
-  if (length(uv) < 0.002) {
+  if (length(uv) < 0.004) {
     fragColor = vec4(1.0,0.0,0.0,1.0);
     return;
   }
   float d = length(uv * 4.0);
 
-  uv *= 20.0;
+  uv *= 15.0;
 
   float G = 2.0;
   float age = mod(iTime, G) / G;
   float generation = floor(iTime / G);
-  if (int(generation) % 2 == 1) invert = !invert;
+  // if (int(generation) % 2 == 1) invert = !invert;
 
 
-  float g = fbm(vec3(uv, generation));
+  float g = fbm(vec3(uv, iTime));
+  g = fbm(vec3(uv + g * 2.0, iTime * 0.1));
   g = g * 0.5 + 0.5; // rescale to (0,1)
 
-  g = (g + (1.0 - d)) / 2.0;
+  float D = 2.0;
+  g = (g + D * (1.0 + d)) / (D + 1.0);
 
-  g = g > age ? 1.0 : 0.0;
+  // g = g > age ? 1.0 : 0.0;
+  g = mod(g + iTime / G, 2.0) > 1.0 ? 1.0 : 0.0;
   if (invert) g = 1.0 - g;
+  float F = 4.0;
+  g = (g * F + 0.5) / (F + 1.0);
+
   fragColor = vec4(vec3(g), 1.0);
 }
