@@ -19,6 +19,7 @@
 		<option value="resize">Resize</option>
 		<option value="getcolor">Get color</option>
 	</select>
+	<input type=checkbox id=poll><label for=poll>Poll</label></input>
 </div>
 <div id=list></div>
 <pre id=err></pre>
@@ -261,6 +262,10 @@ function compileShader(link) {
 
 function reload(firstTime) {
 		// drawGraph();
+	if (!firstTime && !$("#poll").checked) {
+		setTimeout(reload, 1000);
+		return;
+	}
 
 	var ls = new XMLHttpRequest();
 	ls.open("GET", "./?now=" + +new Date(), true);
@@ -329,7 +334,7 @@ function reload(firstTime) {
 				delete SHADERS[i];
 			}
 		}
- 		setTimeout(reload, 1000);
+ 		setTimeout(reload, 200);
 	}
 	ls.send();
 }
