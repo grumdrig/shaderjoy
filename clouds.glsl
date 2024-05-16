@@ -44,7 +44,10 @@ float fbm(vec2 n) {
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
     vec2 p = fragCoord.xy / iResolution.xy;
-	vec2 uv = p*vec2(iResolution.x/iResolution.y,1.0);
+	vec2 uv = p * vec2(iResolution.x/iResolution.y, 1.0);
+
+    // uv.y = 1.0 / uv.y;
+
     float time = iTime * speed;
     float q = fbm(uv * cloudscale * 0.5);
 
@@ -61,7 +64,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
     //noise shape
 	float f = 0.0;
-    uv = p*vec2(iResolution.x/iResolution.y,1.0);
+    uv = p * vec2(iResolution.x/iResolution.y,1.0);
 	uv *= cloudscale;
     uv -= q - time;
     weight = 0.7;

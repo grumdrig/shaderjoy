@@ -30,13 +30,15 @@
 	canvas { border: solid 1px black; background-color: black; }
 	.item {
 		color: blue;
-		cursor: default;
+		cursor: pointer;
 		background-color: #ffe;
 		margin: 4px;
-		padding: 4px;
+		padding: 1px 4px;
+		border-radius: 5px;
+		display: inline-block;
 	}
 	.item:before {
-		content: "\2602\0020";
+		content: "\2602\0020"; /* umbrella */
 	}
 	.selected { font-weight: bold }
 	div { font-family: Tahoma; font-size: 14px; }
@@ -260,9 +262,9 @@ function compileShader(link) {
 	window.requestAnimationFrame(tick);
 }
 
-function reload(firstTime) {
+function reload(firstTime, force) {
 		// drawGraph();
-	if (!firstTime && !$("#poll").checked) {
+	if (!firstTime && !force && !$("#poll").checked) {
 		setTimeout(reload, 1000);
 		return;
 	}
@@ -283,7 +285,10 @@ function reload(firstTime) {
 				link.filename = filename;
 				link.innerHTML = filename;
 				link.classList.add("item");
-				link.onclick = function (e) { this.currentContents = 0; }  // Cause a reload
+				link.onclick = function (e) {
+					this.currentContents = 0;
+					reload(false,true);
+				}
 				$("#list").appendChild(link);
 			}
 			link.request = new XMLHttpRequest();
