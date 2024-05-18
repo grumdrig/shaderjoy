@@ -104,6 +104,10 @@ vec2 sstep(vec2 x) {
 }
 
 // https://www.youtube.com/watch?v=aeEn609nkRs
+// Sadly this video is private probably due to copyright takedown
+// and I don't remember what movie this shader is inspired by.
+// Maybe alien?
+
 #define iNumPoints 10000
 #define ClearColor (0,0,0,1)
 

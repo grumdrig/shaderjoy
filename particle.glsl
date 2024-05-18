@@ -1,12 +1,13 @@
 // Define this magic value to set the number of points that get rendered
 #define iNumPoints 100
 
+
 void mainParticle(out vec2 pointPosition, out float pointSize, in int pointIndex) {
 	float a = 0.2 * float(pointIndex) + iTime;
 	pointPosition = vec2(cos(a), sin(a * 1.618));
 	// pointPosition.x *= iResolution.y / iResolution.x;
 	pointPosition *= 0.8;
-	pointSize = 25.0;// * float(pointIndex) / float(iNumPoints);
+	pointSize = 25.0;
 }
 
 void mainImage(out vec4 fragColor, in vec2 pointCoord, in int pointIndex) {
