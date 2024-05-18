@@ -53,6 +53,7 @@
 	#rewind:before { content: "\21e4" }
 	#status span { margin-left: 10px; }
 </style>
+<script src='shaderjoy.js'></script>
 <script>
 
 function $(s) { return document.querySelector(s); }
@@ -71,8 +72,11 @@ let gl = canvas.getContext("webgl2", {
 	// premultipliedAlpha: false,
 	// alpha: false,
 });
-let program;
+let PROGRAM;
 let SHADERS = {};
+let PAUSED = false;
+let TIMESTAMP = 1/0;
+
 
 if (!gl) {
 	let c = canvas.getContext("2d");
@@ -82,8 +86,6 @@ if (!gl) {
 	c.fillText("Support for WebGL2", 10, 0.55 * canvas.height, canvas.width - 20);
 	c.fillText("So no joy for you", 10, 0.85 * canvas.height, canvas.width - 20);
 }
-
-let ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 
 // This isn't quite the way shadertoy decides mouse positions, regarding
 // clicks, but since dragging resizes, just going with this scheme, for the
@@ -133,139 +135,9 @@ function contrastingColor(r, g, b) {
 	}
 }
 
-const UNIFORMS = `
-		uniform vec3      iResolution;      // viewport resolution (in pixels)
-		uniform float     iTime;            // shader playback time (in seconds)
-		uniform float     iGlobalTime;      // obsolescent progenitor of iTime
-		uniform float     iTimeDelta;       // render time (in seconds)
-		uniform mediump int       iFrame;   // shader playback frame
-		uniform vec4      iMouse;           // mouse coords. xy: current (if MLB down), zw: click
-		uniform vec4      iDate;            // (year, month, day, time in seconds)
-`;
 
 let anythingLoaded = false;
 
-function compileShader(link) {
-	let code = link.currentContents;
-
-	program = gl.createProgram();
-	program.isParticleShader = code.search(/\bmainParticle\b/g) >= 0;
-	program.isPixelShader = !program.isParticleShader;
-
-	let includedCode = '';
-
-	for (let m of code.matchAll(/^#include\s+"([^"]+)"\s*$/gm)) {
-		let filename = m[1].slice(0, -5); // remove ext
-		console.log(filename, SHADERS[filename], SHADERS);
-		includedCode += `
-			#define mainImage ${filename}_mainImage
-			#line 1
-			${SHADERS[filename].currentContents}
-			#undef mainImage
-		`;
-	}
-
-	// Vertex shader
-	let vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	if (program.isPixelShader) {
-		gl.shaderSource(vertexShader, `#version 300 es
-			precision highp float;
-
-			void main() {
-				gl_Position = vec4(1, -1, 0, 1);
-				if (gl_VertexID < 4 && gl_VertexID != 1) gl_Position.x = -1.0;
-				if (gl_VertexID > 1 && gl_VertexID != 4) gl_Position.y = 1.0;
-			}
-		`);
-	} else {
-		gl.shaderSource(vertexShader, `#version 300 es
-			precision highp float;
-
-			${UNIFORMS}
-
-			flat out int pointIndex;
-
-			#line 1
-			${code}
-
-			void main() {
-				mainParticle(gl_Position.xy, gl_PointSize, gl_VertexID);
-				gl_Position.zw = vec2(0, 1);
-				pointIndex = gl_VertexID;
-			}
-		`);
-	}
-	gl.compileShader(vertexShader);
-	if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vertexShader));
-
-	// Fragment shader
-	let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	if (program.isPixelShader) {
-		gl.shaderSource(fragmentShader, `#version 300 es
-			precision highp float;
-
-			${UNIFORMS}
-
-			out vec4 FragColor;
-
-			${includedCode}
-
-			#line 1
-			${code}
-
-			void main() {
-				mainImage(FragColor, gl_FragCoord.xy);
-			}
-		`);
-	} else {
-		gl.shaderSource(fragmentShader, `#version 300 es
-			precision highp float;
-
-			${UNIFORMS}
-
-			flat in int pointIndex;
-			out vec4 FragColor;
-
-			#line 1
-			${code}
-
-			void main() {
-				mainImage(FragColor, gl_PointCoord, pointIndex);
-			}
-		`);
-	}
-	gl.compileShader(fragmentShader);
-	if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fragmentShader), link.filename);
-
-	gl.attachShader(program, vertexShader);
-	gl.attachShader(program, fragmentShader);
-	gl.linkProgram(program);
-	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-	gl.useProgram(program);
-
-	if (program.isParticleShader) {
-		program.iNumPoints = 100;
-		let m = code.match(/^#\s*define\s+iNumPoints\s+([0-9]+)/m);
-		if (m) {
-			program.iNumPoints = parseInt(m[1]);
-		}
-
-		m = code.match(/^#\s*define\s+ClearColor\s+\(\s*([^,)])\s*,\s*([^,)])\s*,\s*([^,)])\s*,\s*([^,)])\s*\)/m);
-		if (m) {
-			gl.clearColor(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]));
-		}
-
-		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-	} else {
-		gl.disable(gl.BLEND);
-	}
-
-	if (!anythingLoaded) {
-		window.requestAnimationFrame(tick);
-		anythingLoaded = true;
-	}
-}
 
 function reload(firstTime, force) {
 		// drawGraph();
@@ -303,7 +175,7 @@ function reload(firstTime, force) {
 				if (this.status != 200) throw new Error("Error loading script");
 				if (link.currentContents !== this.responseText) {
 					link.lastModified = +new Date(this.getResponseHeader("Last-Modified"));
-					console.log("Loading", filename, link.lastModified);
+					// console.log("Loading", filename, link.lastModified);
 					link.currentContents = this.responseText;
 
 					if (firstTime) {
@@ -327,7 +199,8 @@ function reload(firstTime, force) {
 								SHADERS[i].classList.remove("selected");
 							}
 						}
-						compileShader(link);
+						if (!PROGRAM) window.requestAnimationFrame(tick);
+						PROGRAM = compileShader(link.currentContents, link.filename);
 						$("#title").innerText = link.filename;
 					} catch (e) {
 						let numbered = link.currentContents.split('\n').map((c,i)=>i+1 + ": " + c).join('\n');
@@ -349,9 +222,6 @@ function reload(firstTime, force) {
 	ls.send();
 }
 
-let PAUSED = false;
-let T0, T1 = 0, DT = 0;
-let FRAME = 0;
 $("#rewind").onclick = rewind;
 function rewind() {
 	T0 = null;
@@ -370,71 +240,23 @@ $("#pause").onclick = function (e) {
 }
 
 
-let timer = 0;
-
-let TIMESTAMP = 1/0;
 function tick(timestamp) {
 	// Shitty code seems to mount up calls to requestAnimationFrame
 	// TODO: I think I fixed this but have to check before removing
-	if (timestamp == TIMESTAMP) return;
+	if (timestamp == TIMESTAMP) {
+		throw "I thought I fixed this";
+		return;
+	}
 	TIMESTAMP = timestamp;
 
 	if (PAUSED == false) {
-		let clock = performance.now();
-		gl.viewport(0, 0, canvas.width, canvas.height);
-		if (T0 === null) {
-			T0 = clock;
-			FRAME = 0;
-		}
-		FRAME++;
-		const now = (clock - T0)/1000;
-		const dk = .99;
-		DT = DT * dk + (1-dk) * (clock - T1)/1000;
-		$("#clock").innerText = now.toFixed(2);
-		$("#fps").innerText = (1 / DT).toFixed(2);
-		gl.uniform3f(gl.getUniformLocation(program, "iResolution"), canvas.width, canvas.height, 1);
-		gl.uniform1f(gl.getUniformLocation(program, "iTime"), now);
-		gl.uniform1f(gl.getUniformLocation(program, "iGlobalTime"), now);
-		gl.uniform1f(gl.getUniformLocation(program, "iTimeDelta"), DT);
-		gl.uniform1i(gl.getUniformLocation(program, "iFrame"), FRAME);
-		gl.uniform4fv(gl.getUniformLocation(program, "iMouse"), canvas.iMouse);
-		let today = new Date();
-		gl.uniform4f(gl.getUniformLocation(program, "iDate"), today.getFullYear(), today.getMonth(), today.getDay(), +today);
-		T1 = clock;
-
-		if (ext && ext.query && (!ext.last || now - ext.last > 0.1)) {
-			ext.last = now;
-			const available = gl.getQueryParameter(ext.query, gl.QUERY_RESULT_AVAILABLE);
-			const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
-
-			if (available && !disjoint) {
-				let timeElapsed = gl.getQueryParameter(ext.query, gl.QUERY_RESULT) / 1e6;
-				$("#timer").innerText = timeElapsed.toFixed(4);
-				gl.deleteQuery(ext.query);
-				ext.query = null;
-			}
-		}
-
-		let query;
-		if (ext && !ext.query) {
-			query = gl.createQuery();
-			gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
-		}
-
-		if(program.isParticleShader) {
-			gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
-			gl.uniform1i(gl.getUniformLocation(program, "iNumPoints"), program.iNumPoints);
-			gl.drawArrays(gl.POINTS, 0, program.iNumPoints);
-		} else {
-			gl.drawArrays(gl.TRIANGLES, 0, 6);
-		}
-
-		if (query) {
-			ext.query = query;
-			gl.endQuery(ext.TIME_ELAPSED_EXT);
-		}
-
+		renderFrame(PROGRAM, canvas);
 	}
+
+	$("#clock").innerText = NOW.toFixed(2);
+	$("#fps").innerText = (1 / DT).toFixed(2);
+	$("#timer").innerText = (TIME_ELAPSED ?? 0).toFixed(4);
+
 	window.requestAnimationFrame(tick);
 }
 
@@ -509,7 +331,7 @@ function goAudio() {
 
 $("#audiobutton").addEventListener('click', e => goAudio());
 
-reload(true);
+window.onload = _ => reload(true);
 
 
 </script>
