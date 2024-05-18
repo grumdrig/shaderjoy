@@ -1,3 +1,4 @@
+#! swift
 import Foundation
 
 typealias float = Float
