@@ -143,6 +143,8 @@ const UNIFORMS = `
 		uniform vec4      iDate;            // (year, month, day, time in seconds)
 `;
 
+let anythingLoaded = false;
+
 function compileShader(link) {
 	let code = link.currentContents;
 
@@ -259,7 +261,10 @@ function compileShader(link) {
 		gl.disable(gl.BLEND);
 	}
 
-	window.requestAnimationFrame(tick);
+	if (!anythingLoaded) {
+		window.requestAnimationFrame(tick);
+		anythingLoaded = true;
+	}
 }
 
 function reload(firstTime, force) {
@@ -370,6 +375,7 @@ let timer = 0;
 let TIMESTAMP = 1/0;
 function tick(timestamp) {
 	// Shitty code seems to mount up calls to requestAnimationFrame
+	// TODO: I think I fixed this but have to check before removing
 	if (timestamp == TIMESTAMP) return;
 	TIMESTAMP = timestamp;
 
