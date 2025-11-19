@@ -142,7 +142,7 @@ let anythingLoaded = false;
 function reload(firstTime, force) {
 		// drawGraph();
 	if (!firstTime && !force && !$("#poll").checked) {
-		setTimeout(reload, 1000);
+		setTimeout(reload, 5000);
 		return;
 	}
 
