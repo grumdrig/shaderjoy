@@ -1,299 +1,326 @@
 <!doctype html>
+
 <head>
-<title>Shaderjoy</title>
-<meta charset="utf-8"/>
+	<title>Shaderjoy</title>
+	<meta charset="utf-8" />
 </head>
+
 <body>
-<div id=title>Shaderjoy</div>
-<canvas></canvas>
-<!-- <canvas id="graph" width=256 height=256></canvas>-->
-<div id=status>
-	<span id="rewind"></span>
-	<span id="pause">&#10073;&#10073;</span>
-	<span id="clock"></span>
-	<span id="fps"></span> fps
-	<span id="timer">?</span> msec
-	Mouse:
-	<select id="mouseaction">
-		<option value="interact">Interact</option>
-		<option value="resize">Resize</option>
-		<option value="getcolor">Get color</option>
-	</select>
-	<input type=checkbox id=poll><label for=poll>Poll</label></input>
-</div>
-<div id=list></div>
-<pre id=err></pre>
-<form>
-<style>
-	input { font-size: 14px; }
-	#err { color: #800; }
-	canvas { border: solid 1px black; background-color: black; }
-	.item {
-		color: blue;
-		cursor: pointer;
-		background-color: #ffe;
-		margin: 4px;
-		padding: 1px 4px;
-		border-radius: 5px;
-		display: inline-block;
-	}
-	.item:before {
-		content: "\2602\0020"; /* umbrella */
-	}
-	.selected { font-weight: bold }
-	div { font-family: Tahoma; font-size: 14px; }
-	#status, #title {
-		font-weight: bold;
-		margin-bottom: 10px;
-	}
-	#list { margin-bottom: 10px; }
-	#title { font-family: Bookman; font-size: 20px; font-style: italic; }
-	body { background-color: #d2d0d2; margin-left: 100px; }
-	#rewind, #pause { cursor: default; width: 10px; display: inline-block; }
-	#rewind:before { content: "\21e4" }
-	#status span { margin-left: 10px; }
-</style>
-<script src='shaderjoy.js'></script>
-<script>
+	<div id=title>Shaderjoy</div>
+	<canvas></canvas>
+	<!-- <canvas id="graph" width=256 height=256></canvas>-->
+	<div id=status>
+		<span id="rewind"></span>
+		<span id="pause">&#10073;&#10073;</span>
+		<span id="clock"></span>
+		<span id="fps"></span> fps
+		<span id="timer">?</span> msec
+		Mouse:
+		<select id="mouseaction">
+			<option value="interact">Interact</option>
+			<option value="resize">Resize</option>
+			<option value="getcolor">Get color</option>
+		</select>
 
-function $(s) { return document.querySelector(s); }
-
-function mouseaction() { return $("#mouseaction").value }
-
-const abs = Math.abs, min = Math.min;
-
-let canvas = $("canvas");
-canvas.width = 840;
-canvas.height = 472;
-canvas.iMouse = [0,0,0,0];
-let gl = canvas.getContext("webgl2", {
-	preserveDrawingBuffer: true,
-	// https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html
-	// premultipliedAlpha: false,
-	// alpha: false,
-});
-let PROGRAM;
-let SHADERS = {};
-let PAUSED = false;
-let TIMESTAMP = 1/0;
-
-
-if (!gl) {
-	let c = canvas.getContext("2d");
-	c.fillStyle = "red";
-	c.font = "bold 60px sans-serif";
-	c.fillText("Your browser must have ", 10, 0.25 * canvas.height, canvas.width - 20);
-	c.fillText("Support for WebGL2", 10, 0.55 * canvas.height, canvas.width - 20);
-	c.fillText("So no joy for you", 10, 0.85 * canvas.height, canvas.width - 20);
-}
-
-// This isn't quite the way shadertoy decides mouse positions, regarding
-// clicks, but since dragging resizes, just going with this scheme, for the
-// time being at least.
-
-function mousePos(e) {
-	let rect = canvas.getBoundingClientRect();
-	return [e.clientX - rect.left,
-			rect.height - 1 - (e.clientY - rect.top)];
-}
-
-canvas.addEventListener("mousemove", function (e) {
-	let [mx, my] = mousePos(e);
-	if (mouseaction() === "getcolor") {
-		let p = new Uint8Array(4);
-		gl.readPixels(mx, my, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
-	    $("body").style.backgroundColor = `rgb(${p[0]},${p[1]},${p[2]})`;
-	    $("body").style.color = contrastingColor(p[0], p[1], p[2]);
-	} else if (mouseaction() == "interact" && e.buttons) {
-		[canvas.iMouse[0], canvas.iMouse[1]] = mousePos(e);
-	} else if (mouseaction() === "resize" && e.buttons) {
-		let p = mousePos(e);
-		canvas.width += p[0] - canvas.lastMousePosition[0];
-		canvas.height -= p[1] - canvas.lastMousePosition[1];
-		canvas.lastMousePosition = p;
-	}
-});
-
-canvas.addEventListener("mousedown", function (e) {
-	if (mouseaction() === "interact") {
-		[canvas.iMouse[0], canvas.iMouse[1]] = [canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
-	} else if (mouseaction() === "resize") {
-		canvas.lastMousePosition = mousePos(e);
-	}
-});
-
-function contrastingColor(r, g, b) {
-	const dr = abs(r - 128);
-	const dg = abs(g - 128);
-	const db = abs(b - 128);
-	if (dr < min(dg, db)) {
-		return `rgb(${r < 128 ? 255 : 0},${255-g},${255-b})`;
-	} else if (dg < db) {
-		return `rgb(${255-r},${g < 128 ? 255 : 0},${255-b})`;
-	} else {
-		return `rgb(${255-r},${255-g},${b < 128 ? 255 : 0})`;
-	}
-}
-
-
-let anythingLoaded = false;
-
-
-function reload(firstTime, force) {
-		// drawGraph();
-	if (!firstTime && !force && !$("#poll").checked) {
-		setTimeout(reload, 5000);
-		return;
-	}
-
-	var ls = new XMLHttpRequest();
-	ls.open("GET", "./?now=" + +new Date(), true);
-	for (let i in SHADERS) SHADERS[i].request = null;
-	ls.onload = function (e) {
-		if (this.status != 200) throw new Error("Error loading directory listing");
-		let newest;
-		let re = /href="(.+)\.glsl"/g, match;
-		while (match = re.exec(this.responseText)) {
-			let filename = match[1];
-
-			let link = SHADERS[filename];
-			if (!link) {
-				link = SHADERS[filename] = document.createElement('span');
-				link.filename = filename;
-				link.innerHTML = filename;
-				link.classList.add("item");
-				link.onclick = function (e) {
-					this.currentContents = 0;
-					reload(false,true);
-				}
-				$("#list").appendChild(link);
+	</div>
+	<div id=list></div>
+	<pre id=err></pre>
+	<form>
+		<style>
+			input {
+				font-size: 14px;
 			}
-			link.request = new XMLHttpRequest();
-			link.request.open("GET", filename + ".glsl?now=" + +new Date(), true);
-			//link.request.responseType = "blob";
-			link.request.onload = function (e) {
-				if (this.status != 200) throw new Error("Error loading script");
-				if (link.currentContents !== this.responseText) {
-					link.lastModified = +new Date(this.getResponseHeader("Last-Modified"));
-					// console.log("Loading", filename, link.lastModified);
-					link.currentContents = this.responseText;
 
-					if (firstTime) {
-						// This first time, just load the most recently modified file
-						for (let i in SHADERS) {
-							if (!SHADERS[i].currentContents)
-								return;  // Still loading
-							if (SHADERS[i].lastModified > link.lastModified) {
-								link = SHADERS[i];
-							}
-						}
-						$("#title").innerText = link.filename;
-					}
+			#err {
+				color: #800;
+			}
 
-					try {
-						$("#err").innerText = "";
-						for (let i in SHADERS) {
-							if (SHADERS[i] === link) {
-								SHADERS[i].classList.add("selected");
-							} else {
-								SHADERS[i].classList.remove("selected");
-							}
-						}
-						if (!PROGRAM) window.requestAnimationFrame(tick);
-						PROGRAM = compileShader(link.currentContents, link.filename);
-						$("#title").innerText = link.filename;
-					} catch (e) {
-						let numbered = link.currentContents.split('\n').map((c,i)=>i+1 + ": " + c).join('\n');
-						$("#err").innerText = `Error compiling "${link.filename}":\n${e}\n${numbered}`;
-					}
+			canvas {
+				border: solid 1px black;
+				background-color: black;
+			}
 
+			.item {
+				color: blue;
+				cursor: pointer;
+				background-color: #ffe;
+				margin: 4px;
+				padding: 1px 4px;
+				border-radius: 5px;
+				display: inline-block;
+			}
+
+			.item:before {
+				content: "\2602\0020";
+				/* umbrella */
+			}
+
+			.selected {
+				font-weight: bold
+			}
+
+			div {
+				font-family: Tahoma;
+				font-size: 14px;
+			}
+
+			#status,
+			#title {
+				font-weight: bold;
+				margin-bottom: 10px;
+			}
+
+			#list {
+				margin-bottom: 10px;
+			}
+
+			#title {
+				font-family: Bookman;
+				font-size: 20px;
+				font-style: italic;
+			}
+
+			body {
+				background-color: #d2d0d2;
+				margin-left: 100px;
+			}
+
+			#rewind,
+			#pause {
+				cursor: default;
+				width: 10px;
+				display: inline-block;
+			}
+
+			#rewind:before {
+				content: "\21e4"
+			}
+
+			#status span {
+				margin-left: 10px;
+			}
+		</style>
+		<script src='shaderjoy.js'></script>
+		<script>
+
+			function $(s) { return document.querySelector(s); }
+
+			function mouseaction() { return $("#mouseaction").value }
+
+			const abs = Math.abs, min = Math.min;
+
+			let canvas = $("canvas");
+			canvas.width = 840;
+			canvas.height = 472;
+			canvas.iMouse = [0, 0, 0, 0];
+			let gl = canvas.getContext("webgl2", {
+				preserveDrawingBuffer: true,
+				// https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html
+				// premultipliedAlpha: false,
+				// alpha: false,
+			});
+			let PROGRAM;
+			let SHADERS = {};
+			let PAUSED = false;
+			let TIMESTAMP = 1 / 0;
+
+
+			if (!gl) {
+				let c = canvas.getContext("2d");
+				c.fillStyle = "red";
+				c.font = "bold 60px sans-serif";
+				c.fillText("Your browser must have ", 10, 0.25 * canvas.height, canvas.width - 20);
+				c.fillText("Support for WebGL2", 10, 0.55 * canvas.height, canvas.width - 20);
+				c.fillText("So no joy for you", 10, 0.85 * canvas.height, canvas.width - 20);
+			}
+
+			// This isn't quite the way shadertoy decides mouse positions, regarding
+			// clicks, but since dragging resizes, just going with this scheme, for the
+			// time being at least.
+
+			function mousePos(e) {
+				let rect = canvas.getBoundingClientRect();
+				return [e.clientX - rect.left,
+				rect.height - 1 - (e.clientY - rect.top)];
+			}
+
+			canvas.addEventListener("mousemove", function (e) {
+				let [mx, my] = mousePos(e);
+				if (mouseaction() === "getcolor") {
+					let p = new Uint8Array(4);
+					gl.readPixels(mx, my, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
+					$("body").style.backgroundColor = `rgb(${p[0]},${p[1]},${p[2]})`;
+					$("body").style.color = contrastingColor(p[0], p[1], p[2]);
+				} else if (mouseaction() == "interact" && e.buttons) {
+					[canvas.iMouse[0], canvas.iMouse[1]] = mousePos(e);
+				} else if (mouseaction() === "resize" && e.buttons) {
+					let p = mousePos(e);
+					canvas.width += p[0] - canvas.lastMousePosition[0];
+					canvas.height -= p[1] - canvas.lastMousePosition[1];
+					canvas.lastMousePosition = p;
+				}
+			});
+
+			canvas.addEventListener("mousedown", function (e) {
+				if (mouseaction() === "interact") {
+					[canvas.iMouse[0], canvas.iMouse[1]] = [canvas.iMouse[2], canvas.iMouse[3]] = mousePos(e);
+				} else if (mouseaction() === "resize") {
+					canvas.lastMousePosition = mousePos(e);
+				}
+			});
+
+			function contrastingColor(r, g, b) {
+				const dr = abs(r - 128);
+				const dg = abs(g - 128);
+				const db = abs(b - 128);
+				if (dr < min(dg, db)) {
+					return `rgb(${r < 128 ? 255 : 0},${255 - g},${255 - b})`;
+				} else if (dg < db) {
+					return `rgb(${255 - r},${g < 128 ? 255 : 0},${255 - b})`;
+				} else {
+					return `rgb(${255 - r},${255 - g},${b < 128 ? 255 : 0})`;
 				}
 			}
-			link.request.send();
-		}
-		for (let i in SHADERS) {
-			if (!SHADERS[i].request) {
-				SHADERS[i].parentElement.removeChild(SHADERS[i]);
-				delete SHADERS[i];
+
+
+			function ensureShaderLink(filename) {
+				let link = SHADERS[filename];
+				if (!link) {
+					link = SHADERS[filename] = document.createElement('span');
+					link.filename = filename;
+					link.innerHTML = filename;
+					link.classList.add("item");
+					link.onclick = function () {
+						// Click to select: fetch and compile this shader
+						fetch(filename + '.glsl').then(r => r.text()).then(code => {
+							loadShader(filename, code);
+						});
+					}
+					$("#list").appendChild(link);
+				}
+				return link;
 			}
-		}
- 		setTimeout(reload, 200);
-	}
-	ls.send();
-}
 
-$("#rewind").onclick = rewind;
-function rewind() {
-	T0 = null;
-	if (PAUSED) PAUSED = 0;
-}
-rewind();
+			function loadShader(filename, code) {
+				let link = ensureShaderLink(filename);
+				link.currentContents = code;
 
-$("#pause").onclick = function (e) {
-	if (PAUSED !== false) {
-		T0 = performance.now() - PAUSED;
-		PAUSED = false;
-	} else {
-		PAUSED = T1 - T0;
-	}
-	this.innerHTML = PAUSED ? "&#9658;" : "&#10073;&#10073;";
-}
+				try {
+					$("#err").innerText = "";
+					for (let i in SHADERS) {
+						SHADERS[i].classList.toggle("selected", SHADERS[i] === link);
+					}
+					if (!PROGRAM) window.requestAnimationFrame(tick);
+					PROGRAM = compileShader(code, filename);
+					$("#title").innerText = filename;
+				} catch (e) {
+					let numbered = code.split('\n').map((c, i) => i + 1 + ": " + c).join('\n');
+					$("#err").innerText = `Error compiling "${filename}":\n${e}\n${numbered}`;
+				}
+			}
+
+			// SSE: receive file list updates and content pushes from server
+			function connectSSE() {
+				const es = new EventSource('/events');
+
+				// Server sends the full file list on connect and on any add/remove
+				es.addEventListener('filelist', e => {
+					const names = JSON.parse(e.data);
+					const nameSet = new Set(names);
+					// Add new entries
+					for (const name of names) ensureShaderLink(name);
+					// Remove deleted entries
+					for (let i in SHADERS) {
+						if (!nameSet.has(i)) {
+							SHADERS[i].remove();
+							delete SHADERS[i];
+						}
+					}
+				});
+
+				// Server pushes changed file contents
+				es.addEventListener('change', e => {
+					const { name, contents } = JSON.parse(e.data);
+					loadShader(name, contents);
+				});
+
+				es.onerror = () => {
+					// EventSource auto-reconnects, nothing to do
+				};
+			}
+
+			$("#rewind").onclick = rewind;
+			function rewind() {
+				T0 = null;
+				if (PAUSED) PAUSED = 0;
+			}
+			rewind();
+
+			$("#pause").onclick = function (e) {
+				if (PAUSED !== false) {
+					T0 = performance.now() - PAUSED;
+					PAUSED = false;
+				} else {
+					PAUSED = T1 - T0;
+				}
+				this.innerHTML = PAUSED ? "&#9658;" : "&#10073;&#10073;";
+			}
 
 
-function tick(timestamp) {
-	// Shitty code seems to mount up calls to requestAnimationFrame
-	// TODO: I think I fixed this but have to check before removing
-	if (timestamp == TIMESTAMP) {
-		throw "I thought I fixed this";
-		return;
-	}
-	TIMESTAMP = timestamp;
+			function tick(timestamp) {
+				// Shitty code seems to mount up calls to requestAnimationFrame
+				// TODO: I think I fixed this but have to check before removing
+				if (timestamp == TIMESTAMP) {
+					throw "I thought I fixed this";
+					return;
+				}
+				TIMESTAMP = timestamp;
 
-	if (PAUSED == false) {
-		renderFrame(PROGRAM, canvas);
-	}
+				if (PAUSED == false) {
+					renderFrame(PROGRAM, canvas);
+				}
 
-	$("#clock").innerText = NOW.toFixed(2);
-	$("#fps").innerText = (1 / DT).toFixed(2);
-	$("#timer").innerText = (TIME_ELAPSED ?? 0).toFixed(4);
+				$("#clock").innerText = NOW.toFixed(2);
+				$("#fps").innerText = (1 / DT).toFixed(2);
+				$("#timer").innerText = (TIME_ELAPSED ?? 0).toFixed(4);
 
-	window.requestAnimationFrame(tick);
-}
+				window.requestAnimationFrame(tick);
+			}
 
-function drawGraph() {
-	let can = $("#graph");
-	let ctx = can.getContext("2d");
-	ctx.fillStyle = "silver";
-	ctx.fillRect(0, 0, can.width, can.height);
-	let p = new Uint8Array(4 * can.width);
-	for (var x = 0; x < can.width; x++) {
-		let t = x / (can.width - 1);
-		gl.readPixels((abs(canvas.iMouse[2]) + (canvas.iMouse[0] - abs(canvas.iMouse[2])) * t) >> 0,
-		 			  (abs(canvas.iMouse[3]) + (canvas.iMouse[1] - abs(canvas.iMouse[3])) * t) >> 0,
-					  1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p, 4 * x);
-	}
-	for (var c = 0; c < 3; ++c) {
-		ctx.strokeStyle = ["#F00","#0F0","#00F"][c];
-		ctx.beginPath();
-		for (var x = 0; x < can.width; ++x)
-			ctx.lineTo(x, 255 - p[c + 4 * x]);
-		ctx.stroke();
-	}
-}
+			function drawGraph() {
+				let can = $("#graph");
+				let ctx = can.getContext("2d");
+				ctx.fillStyle = "silver";
+				ctx.fillRect(0, 0, can.width, can.height);
+				let p = new Uint8Array(4 * can.width);
+				for (var x = 0; x < can.width; x++) {
+					let t = x / (can.width - 1);
+					gl.readPixels((abs(canvas.iMouse[2]) + (canvas.iMouse[0] - abs(canvas.iMouse[2])) * t) >> 0,
+						(abs(canvas.iMouse[3]) + (canvas.iMouse[1] - abs(canvas.iMouse[3])) * t) >> 0,
+						1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p, 4 * x);
+				}
+				for (var c = 0; c < 3; ++c) {
+					ctx.strokeStyle = ["#F00", "#0F0", "#00F"][c];
+					ctx.beginPath();
+					for (var x = 0; x < can.width; ++x)
+						ctx.lineTo(x, 255 - p[c + 4 * x]);
+					ctx.stroke();
+				}
+			}
 
-/*
-function textureFromPixelArray(gl, dataArray, type, width, height) {
-    var dataTypedArray = new Uint8Array(dataArray); // Don't need to do this if the data is already in a typed array
-    var texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, type, width, height, 0, type, gl.UNSIGNED_BYTE, dataTypedArray);
-    // Other texture setup here, like filter modes and mipmap generation
-    return texture;
-}
-*/
-</script>
+			/*
+			function textureFromPixelArray(gl, dataArray, type, width, height) {
+				var dataTypedArray = new Uint8Array(dataArray); // Don't need to do this if the data is already in a typed array
+				var texture = gl.createTexture();
+				gl.bindTexture(gl.TEXTURE_2D, texture);
+				gl.texImage2D(gl.TEXTURE_2D, 0, type, width, height, 0, type, gl.UNSIGNED_BYTE, dataTypedArray);
+				// Other texture setup here, like filter modes and mipmap generation
+				return texture;
+			}
+			*/
+		</script>
 
-<script id="audioworklet" type="worklet" type=>
+		<script id="audioworklet" type="worklet" type=>
 // This "type=" mumbo jumbo causes Sublime Text to syntax highlight as JS but the script not
 // to execute, in Chrome at least
 
@@ -315,25 +342,25 @@ registerProcessor('GpuAudio', class GpuAudio extends AudioWorkletProcessor {
 });
 </script>
 
-<span id="audiobutton">Audio</span>
+		<span id="audiobutton">Audio</span>
 
-<script>
-let AUDIO;
-function goAudio() {
-	let AUDIO = new AudioContext();
-	const blob = new Blob([$("#audioworklet").innerText], {type: "application/javascript"});
-	let url = URL.createObjectURL(blob);
-	AUDIO.audioWorklet.addModule(url).then(() => {
-		var node = new AudioWorkletNode(AUDIO, 'GpuAudio');
-		node.connect(AUDIO.destination);
-	});
-}
+		<script>
+			let AUDIO;
+			function goAudio() {
+				let AUDIO = new AudioContext();
+				const blob = new Blob([$("#audioworklet").innerText], { type: "application/javascript" });
+				let url = URL.createObjectURL(blob);
+				AUDIO.audioWorklet.addModule(url).then(() => {
+					var node = new AudioWorkletNode(AUDIO, 'GpuAudio');
+					node.connect(AUDIO.destination);
+				});
+			}
 
-$("#audiobutton").addEventListener('click', e => goAudio());
+			$("#audiobutton").addEventListener('click', e => goAudio());
 
-window.onload = _ => reload(true);
+			window.onload = _ => connectSSE();
 
 
-</script>
+		</script>
 
 </body>
